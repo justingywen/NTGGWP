@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import Course, Profile, Enrollment, LearningRecord
+from .models import (
+    Course,
+    Profile,
+    Enrollment,
+    LearningRecord,
+    Coupon,
+    Order,
+    CouponUsage,
+)
 
 
 @admin.register(Course)
@@ -28,3 +36,42 @@ class LearningRecordAdmin(admin.ModelAdmin):
     list_display = ('user', 'course', 'minutes', 'watched_at')
     search_fields = ('user__username', 'course__title')
     list_filter = ('course', 'watched_at')
+
+
+@admin.register(Coupon)
+class CouponAdmin(admin.ModelAdmin):
+    list_display = (
+        'code',
+        'name',
+        'discount_type',
+        'discount_value',
+        'min_spend',
+        'start_date',
+        'end_date',
+        'usage_limit',
+        'is_active',
+    )
+    search_fields = ('code', 'name')
+    list_filter = ('discount_type', 'is_active')
+
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = (
+        'user',
+        'course',
+        'original_price',
+        'discount_amount',
+        'final_price',
+        'status',
+        'created_at',
+    )
+    search_fields = ('user__username', 'course__title')
+    list_filter = ('status', 'created_at')
+
+
+@admin.register(CouponUsage)
+class CouponUsageAdmin(admin.ModelAdmin):
+    list_display = ('user', 'coupon', 'order', 'discount_amount', 'used_at')
+    search_fields = ('user__username', 'coupon__code', 'order__course__title')
+    list_filter = ('used_at',)

@@ -89,6 +89,7 @@
   </head>
   <body>
     {% include 'main/partials/navbar.html' %}
+
     <div class="container">
       <div class="card">
         {% if course.image %}
@@ -100,7 +101,9 @@
         {% endif %}
 
         <h1>{{ course.title }}</h1>
-        <div class="info"><strong>講師：</strong>{{ course.teacher }}</div>
+        <div class="info">
+          <strong>講師：</strong>{{ course.teacher.username }}
+        </div>
         <div class="price">NT$ {{ course.price }}</div>
 
         <div class="description">
@@ -111,7 +114,7 @@
         {% if user.is_authenticated %} {% if already_purchased %}
         <p class="purchased-text">你已經購買過這門課程</p>
         {% else %}
-        <a href="{% url 'buy_course' course.id %}" class="buy-btn">立即購買</a>
+        <a href="{% url 'checkout' course.id %}" class="buy-btn">前往結帳</a>
         {% endif %} {% else %}
         <a href="{% url 'login' %}" class="buy-btn">登入後購買</a>
         {% endif %}

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>課程結帳</title>
+    <style>
+      body {
+        font-family: "Microsoft JhengHei", sans-serif;
+        background: #f7f8fb;
+        margin: 0;
+        color: #1f2937;
+      }
+
+      .container {
+        max-width: 760px;
+        margin: 50px auto;
+        padding: 20px;
+      }
+
+      .card {
+        background: white;
+        border-radius: 20px;
+        padding: 32px;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+      }
+
+      h1 {
+        margin-top: 0;
+        font-size: 34px;
+      }
+
+      .course-title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 16px;
+      }
+
+      .row {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 14px 0;
+        font-size: 18px;
+      }
+
+      .final {
+        color: #2563eb;
+        font-weight: bold;
+        font-size: 24px;
+      }
+
+      .form-box {
+        margin-top: 26px;
+        background: #f9fafb;
+        border-radius: 16px;
+        padding: 20px;
+      }
+
+      input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        font-size: 16px;
+        box-sizing: border-box;
+        margin-top: 8px;
+      }
+
+      .btn {
+        display: inline-block;
+        margin-top: 20px;
+        background: #2563eb;
+        color: white;
+        padding: 12px 22px;
+        border-radius: 12px;
+        text-decoration: none;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+      }
+
+      .btn-dark {
+        background: #1f2937;
+      }
+
+      .message-success {
+        color: #16a34a;
+        font-weight: bold;
+        margin-top: 14px;
+      }
+
+      .message-error {
+        color: #dc2626;
+        font-weight: bold;
+        margin-top: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    {% include 'main/partials/navbar.html' %}
+
+    <div class="container">
+      <div class="card">
+        <h1>課程結帳</h1>
+
+        <div class="course-title">{{ course.title }}</div>
+        <p>講師：{{ course.teacher.username }}</p>
+
+        <div class="row">
+          <span>課程原價</span>
+          <strong>NT$ {{ original_price }}</strong>
+        </div>
+
+        <div class="row">
+          <span>折扣金額</span>
+          <strong>NT$ {{ discount_amount }}</strong>
+        </div>
+
+        <div class="row final">
+          <span>實付金額</span>
+          <span>NT$ {{ final_price }}</span>
+        </div>
+
+        <div class="form-box">
+          <form method="post">
+            {% csrf_token %}
+            <label for="id_coupon_code"><strong>優惠碼</strong></label>
+            {{ form.coupon_code }} {% if success_message %}
+            <div class="message-success">{{ success_message }}</div>
+            {% endif %} {% if error_message %}
+            <div class="message-error">{{ error_message }}</div>
+            {% endif %}
+
+            <button type="submit" class="btn">確認購買</button>
+            <a href="{% url 'course_detail' course.id %}" class="btn btn-dark"
+              >返回課程</a
+            >
+          </form>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

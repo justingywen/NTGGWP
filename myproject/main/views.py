@@ -5,8 +5,16 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
-from .models import Course, Profile, Enrollment, LearningRecord
-from .forms import RegisterForm, CourseForm
+from .models import (
+    Course,
+    Profile,
+    Enrollment,
+    LearningRecord,
+    Coupon,
+    Order,
+    CouponUsage,
+)
+from .forms import RegisterForm, CourseForm, CouponApplyForm
 
 
 def home(request):
@@ -160,10 +168,16 @@ def teacher_dashboard(request):
             total=Sum('minutes')
         )['total'] or 0
 
+        total_revenue = Order.objects.filter(
+            course=course,
+            status='paid'
+        ).aggregate(total=Sum('final_price'))['total'] or 0
+
         course_data.append({
             'course': course,
             'purchase_count': purchase_count,
             'total_watch_minutes': total_watch_minutes,
+            'total_revenue': total_revenue,
         })
 
     return render(request, 'main/teacher_dashboard.html', {
@@ -199,7 +213,7 @@ def my_courses(request):
 
 
 @login_required
-def buy_course(request, course_id):
+def checkout(request, course_id):
     course = get_object_or_404(Course, id=course_id)
 
     try:
@@ -207,12 +221,91 @@ def buy_course(request, course_id):
     except Profile.DoesNotExist:
         return redirect('home')
 
-    Enrollment.objects.get_or_create(
-        student=request.user,
-        course=course
-    )
+    if Enrollment.objects.filter(student=request.user, course=course).exists():
+        return redirect('course_detail', course_id=course.id)
 
-    return redirect('purchase_success', course_id=course.id)
+    form = CouponApplyForm(request.POST or None)
+
+    original_price = course.price
+    coupon = None
+    discount_amount = 0
+    final_price = original_price
+    error_message = None
+    success_message = None
+
+    if request.method == 'POST':
+        coupon_code = request.POST.get('coupon_code', '').strip()
+
+        if coupon_code:
+            try:
+                coupon = Coupon.objects.get(code__iexact=coupon_code)
+            except Coupon.DoesNotExist:
+                coupon = None
+                error_message = '找不到這張優惠券。'
+
+            if coupon:
+                if not coupon.is_valid_now():
+                    error_message = '這張優惠券目前不可使用。'
+                    coupon = None
+                else:
+                    discount_amount = coupon.calculate_discount(original_price)
+
+                    if discount_amount <= 0:
+                        error_message = '此優惠券未達最低消費金額或無法套用。'
+                        coupon = None
+                        discount_amount = 0
+                    else:
+                        final_price = original_price - discount_amount
+                        success_message = f'優惠券已套用，折抵 NT$ {discount_amount}。'
+
+        if not error_message:
+            order = Order.objects.create(
+                user=request.user,
+                course=course,
+                coupon=coupon,
+                original_price=original_price,
+                discount_amount=discount_amount,
+                final_price=final_price,
+                status='paid'
+            )
+
+            Enrollment.objects.get_or_create(
+                student=request.user,
+                course=course
+            )
+
+            if coupon:
+                CouponUsage.objects.create(
+                    user=request.user,
+                    coupon=coupon,
+                    order=order,
+                    discount_amount=discount_amount
+                )
+
+            return redirect('order_success', order_id=order.id)
+
+    return render(request, 'main/checkout.html', {
+        'course': course,
+        'form': form,
+        'original_price': original_price,
+        'discount_amount': discount_amount,
+        'final_price': final_price,
+        'error_message': error_message,
+        'success_message': success_message,
+    })
+
+
+@login_required
+def order_success(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    return render(request, 'main/order_success.html', {
+        'order': order
+    })
+
+
+@login_required
+def buy_course(request, course_id):
+    return redirect('checkout', course_id=course_id)
 
 
 @login_required
@@ -307,6 +400,8 @@ def delete_course(request, course_id):
     return render(request, 'main/delete_course.html', {
         'course': course
     })
+
+
 @login_required
 def export_data_page(request):
     if not request.user.is_superuser:

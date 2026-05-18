@@ -7,15 +7,18 @@ urlpatterns = [
 
     path('course/<int:course_id>/', views.course_detail, name='course_detail'),
     path('course/<int:course_id>/buy/', views.buy_course, name='buy_course'),
+    path('course/<int:course_id>/checkout/', views.checkout, name='checkout'),
+    path('order/<int:order_id>/success/', views.order_success, name='order_success'),
     path('course/<int:course_id>/purchase-success/', views.purchase_success, name='purchase_success'),
     path('course/<int:course_id>/watch/', views.watch_course, name='watch_course'),
     path('course/<int:course_id>/edit/', views.edit_course, name='edit_course'),
     path('course/<int:course_id>/delete/', views.delete_course, name='delete_course'),
+
     path('export-data/', views.export_data_page, name='export_data_page'),
-path('export/courses.csv', views.export_courses_csv, name='export_courses_csv'),
-path('export/enrollments.csv', views.export_enrollments_csv, name='export_enrollments_csv'),
-path('export/learning-records.csv', views.export_learning_records_csv, name='export_learning_records_csv'),
-path('export/profiles.csv', views.export_profiles_csv, name='export_profiles_csv'),
+    path('export/courses.csv', views.export_courses_csv, name='export_courses_csv'),
+    path('export/enrollments.csv', views.export_enrollments_csv, name='export_enrollments_csv'),
+    path('export/learning-records.csv', views.export_learning_records_csv, name='export_learning_records_csv'),
+    path('export/profiles.csv', views.export_profiles_csv, name='export_profiles_csv'),
 
     path('register/', views.register, name='register'),
     path('register-success/', views.register_success, name='register_success'),

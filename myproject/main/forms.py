@@ -1,12 +1,13 @@
 from django import forms
 from django.contrib.auth.models import User
-from django import forms
 from .models import Course
+
 
 class CourseForm(forms.ModelForm):
     class Meta:
         model = Course
         fields = ['title', 'price', 'description', 'image']
+
 
 class RegisterForm(forms.Form):
     username = forms.CharField(label='帳號', max_length=150)
@@ -18,6 +19,7 @@ class RegisterForm(forms.Form):
         ('student', '學生'),
         ('teacher', '老師'),
     ]
+
     role = forms.ChoiceField(label='身分', choices=ROLE_CHOICES)
 
     def clean_username(self):
@@ -35,3 +37,14 @@ class RegisterForm(forms.Form):
             raise forms.ValidationError('兩次輸入的密碼不一致。')
 
         return cleaned_data
+
+
+class CouponApplyForm(forms.Form):
+    coupon_code = forms.CharField(
+        label='優惠碼',
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': '請輸入優惠碼，沒有可留空'
+        })
+    )
