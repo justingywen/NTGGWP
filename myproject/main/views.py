@@ -7,6 +7,8 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Avg
 
+from django.utils import timezone
+
 from .models import (
     Course,
     CourseLesson,
@@ -20,6 +22,11 @@ from .models import (
     Payment,
     Notification,
     Review,
+    Cart,
+    CartItem,
+    Favorite,
+    Refund,
+    UserCoupon,
 )
 
 from .forms import RegisterForm, CourseForm, CouponApplyForm, ReviewForm
@@ -43,10 +50,16 @@ def course_detail(request, course_id):
     can_review = False
     my_review = None
     review_form = None
+    is_favorited = False
 
     if request.user.is_authenticated:
         already_purchased = Enrollment.objects.filter(
             student=request.user,
+            course=course
+        ).exists()
+
+        is_favorited = Favorite.objects.filter(
+            user=request.user,
             course=course
         ).exists()
 
@@ -105,6 +118,7 @@ def course_detail(request, course_id):
         'can_review': can_review,
         'my_review': my_review,
         'review_form': review_form,
+        'is_favorited': is_favorited,
     })
 
 
@@ -1117,3 +1131,211 @@ def export_course_lessons_csv(request):
         ])
 
     return response
+
+
+# =========================
+# 購物車 Cart
+# =========================
+
+@login_required
+def add_to_cart(request, course_id):
+    course = get_object_or_404(Course, id=course_id)
+
+    if Enrollment.objects.filter(student=request.user, course=course).exists():
+        return redirect('course_detail', course_id=course.id)
+
+    cart, _ = Cart.objects.get_or_create(user=request.user)
+    CartItem.objects.get_or_create(cart=cart, course=course)
+
+    return redirect('view_cart')
+
+
+@login_required
+def view_cart(request):
+    cart, _ = Cart.objects.get_or_create(user=request.user)
+    items = cart.items.select_related('course', 'course__teacher').all()
+    total = sum(item.course.price for item in items)
+
+    return render(request, 'main/cart.html', {
+        'items': items,
+        'total': total,
+    })
+
+
+@login_required
+def remove_from_cart(request, item_id):
+    item = get_object_or_404(CartItem, id=item_id, cart__user=request.user)
+    item.delete()
+    return redirect('view_cart')
+
+
+@login_required
+def cart_checkout(request):
+    cart, _ = Cart.objects.get_or_create(user=request.user)
+    items = cart.items.select_related('course').all()
+
+    created_count = 0
+
+    for item in items:
+        course = item.course
+
+        if Enrollment.objects.filter(student=request.user, course=course).exists():
+            continue
+
+        order = Order.objects.create(
+            user=request.user,
+            course=course,
+            original_price=course.price,
+            discount_amount=0,
+            final_price=course.price,
+            status='paid'
+        )
+        OrderItem.objects.create(order=order, course=course, price=course.price)
+        Payment.objects.create(
+            order=order,
+            method='mock',
+            amount=course.price,
+            status='paid',
+            transaction_no=f'MOCK-{order.id:05d}',
+            paid_at=order.created_at
+        )
+        Enrollment.objects.get_or_create(student=request.user, course=course)
+        Notification.objects.create(
+            user=request.user,
+            title='購買成功通知',
+            content=f'你已成功購買「{course.title}」，實付金額 NT$ {course.price}。'
+        )
+        created_count += 1
+
+    cart.items.all().delete()
+
+    return redirect('my_courses')
+
+
+# =========================
+# 收藏 Favorite
+# =========================
+
+@login_required
+def toggle_favorite(request, course_id):
+    course = get_object_or_404(Course, id=course_id)
+    favorite = Favorite.objects.filter(user=request.user, course=course).first()
+
+    if favorite:
+        favorite.delete()
+    else:
+        Favorite.objects.create(user=request.user, course=course)
+
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url:
+        return redirect(next_url)
+    return redirect('my_favorites')
+
+
+@login_required
+def my_favorites(request):
+    favorites = Favorite.objects.filter(
+        user=request.user
+    ).select_related('course', 'course__teacher', 'course__category').order_by('-created_at')
+
+    return render(request, 'main/favorites.html', {
+        'favorites': favorites,
+    })
+
+
+# =========================
+# 退款 Refund
+# =========================
+
+@login_required
+def request_refund(request, order_id):
+    order = get_object_or_404(
+        Order, id=order_id, user=request.user, status='paid'
+    )
+
+    existing = Refund.objects.filter(
+        order=order, status__in=['pending', 'approved']
+    ).first()
+
+    if request.method == 'POST' and not existing:
+        reason = request.POST.get('reason', '').strip() or '未填寫原因'
+        Refund.objects.create(
+            order=order,
+            user=request.user,
+            amount=order.final_price,
+            reason=reason,
+            status='pending'
+        )
+        Notification.objects.create(
+            user=request.user,
+            title='退款申請已送出',
+            content=f'訂單 #{order.id} 的退款申請已送出，等待審核。'
+        )
+        return redirect('my_refunds')
+
+    return render(request, 'main/request_refund.html', {
+        'order': order,
+        'existing': existing,
+    })
+
+
+@login_required
+def my_refunds(request):
+    refunds = Refund.objects.filter(
+        user=request.user
+    ).select_related('order', 'order__course').order_by('-created_at')
+
+    orders = Order.objects.filter(
+        user=request.user, status='paid'
+    ).select_related('course').order_by('-created_at')
+
+    return render(request, 'main/refunds.html', {
+        'refunds': refunds,
+        'orders': orders,
+    })
+
+
+# =========================
+# 優惠券領取 UserCoupon
+# =========================
+
+@login_required
+def coupon_list(request):
+    now = timezone.now()
+    coupons = Coupon.objects.filter(
+        is_active=True, start_date__lte=now, end_date__gte=now
+    ).order_by('-created_at')
+
+    claimed_ids = set(
+        UserCoupon.objects.filter(user=request.user).values_list('coupon_id', flat=True)
+    )
+
+    return render(request, 'main/coupons.html', {
+        'coupons': coupons,
+        'claimed_ids': claimed_ids,
+    })
+
+
+@login_required
+def claim_coupon(request, coupon_id):
+    coupon = get_object_or_404(Coupon, id=coupon_id)
+
+    if coupon.is_valid_now():
+        UserCoupon.objects.get_or_create(
+            user=request.user,
+            coupon=coupon,
+            defaults={'status': 'unused'}
+        )
+
+    return redirect('my_coupons')
+
+
+@login_required
+def my_coupons(request):
+    user_coupons = UserCoupon.objects.filter(
+        user=request.user
+    ).select_related('coupon').order_by('-received_at')
+
+    return render(request, 'main/my_coupons.html', {
+        'user_coupons': user_coupons,
+    })

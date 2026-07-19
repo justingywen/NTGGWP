@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>申請退款</title>
+    <style>
+      body { font-family: "Microsoft JhengHei", sans-serif; background: #f5f7fb; margin: 0; color: #222; }
+      .container { max-width: 640px; margin: 0 auto; padding: 40px 20px; }
+      .card { background: #fff; border-radius: 18px; padding: 30px; box-shadow: 0 10px 25px rgba(0,0,0,.08); }
+      h1 { color: #111827; margin-top: 0; }
+      .meta { color: #6b7280; margin-bottom: 20px; }
+      textarea { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 15px; box-sizing: border-box; }
+      .btn { margin-top: 16px; background: #ef4444; color: #fff; padding: 12px 24px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; }
+      .back { display: inline-block; margin-top: 16px; margin-left: 12px; color: #374151; text-decoration: none; }
+      .warn { background: #fef3c7; color: #92400e; padding: 14px; border-radius: 10px; }
+    </style>
+  </head>
+  <body>
+    {% include 'main/partials/navbar.html' %}
+    <div class="container">
+      <div class="card">
+        <h1>申請退款</h1>
+        <div class="meta">
+          課程：{{ order.course.title|default:"多課程訂單" }}<br />
+          訂單 #{{ order.id }} ・ 實付 NT$ {{ order.final_price }}
+        </div>
+        {% if existing %}
+          <p class="warn">此訂單已有一筆退款申請（狀態：{{ existing.get_status_display }}），無法重複申請。</p>
+          <a href="{% url 'my_refunds' %}" class="back">← 返回退款紀錄</a>
+        {% else %}
+          <form method="post">
+            {% csrf_token %}
+            <label><strong>退款原因</strong></label><br /><br />
+            <textarea name="reason" rows="5" placeholder="請說明退款原因"></textarea>
+            <div>
+              <button type="submit" class="btn">送出退款申請</button>
+              <a href="{% url 'my_refunds' %}" class="back">取消</a>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </body>
+</html>

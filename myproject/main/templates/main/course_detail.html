@@ -234,7 +234,20 @@
         {% if user.is_authenticated %} {% if already_purchased %}
         <p class="purchased-text">你已經購買過這門課程</p>
         {% else %}
-        <a href="{% url 'checkout' course.id %}" class="buy-btn">前往結帳</a>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <a href="{% url 'checkout' course.id %}" class="buy-btn">前往結帳</a>
+          <form method="post" action="{% url 'add_to_cart' course.id %}">
+            {% csrf_token %}
+            <button type="submit" class="buy-btn" style="background:#1f2937; border:none; cursor:pointer;">加入購物車</button>
+          </form>
+          <form method="post" action="{% url 'toggle_favorite' course.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'course_detail' course.id %}" />
+            <button type="submit" class="buy-btn" style="background:{% if is_favorited %}#ef4444{% else %}#f59e0b{% endif %}; border:none; cursor:pointer;">
+              {% if is_favorited %}♥ 取消收藏{% else %}♡ 收藏{% endif %}
+            </button>
+          </form>
+        </div>
         {% endif %} {% else %}
         <a href="{% url 'login' %}" class="buy-btn">登入後購買</a>
         {% endif %}

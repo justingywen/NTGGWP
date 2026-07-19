@@ -43,6 +43,25 @@ urlpatterns = [
 
     path('create-course/', views.create_course, name='create_course'),
 
+    # 購物車
+    path('cart/', views.view_cart, name='view_cart'),
+    path('cart/add/<int:course_id>/', views.add_to_cart, name='add_to_cart'),
+    path('cart/remove/<int:item_id>/', views.remove_from_cart, name='remove_from_cart'),
+    path('cart/checkout/', views.cart_checkout, name='cart_checkout'),
+
+    # 收藏
+    path('favorites/', views.my_favorites, name='my_favorites'),
+    path('favorites/toggle/<int:course_id>/', views.toggle_favorite, name='toggle_favorite'),
+
+    # 退款
+    path('refunds/', views.my_refunds, name='my_refunds'),
+    path('refunds/request/<int:order_id>/', views.request_refund, name='request_refund'),
+
+    # 優惠券領取
+    path('coupons/', views.coupon_list, name='coupon_list'),
+    path('coupons/claim/<int:coupon_id>/', views.claim_coupon, name='claim_coupon'),
+    path('my-coupons/', views.my_coupons, name='my_coupons'),
+
     path('password-reset/', auth_views.PasswordResetView.as_view(
         template_name='main/password_reset.html'
     ), name='password_reset'),

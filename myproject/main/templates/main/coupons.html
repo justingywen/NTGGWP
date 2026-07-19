@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>領取優惠券</title>
+    <style>
+      body { font-family: "Microsoft JhengHei", sans-serif; background: #f5f7fb; margin: 0; color: #222; }
+      .container { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+      h1 { color: #111827; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+      .coupon { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 8px 20px rgba(0,0,0,.06); border-left: 6px solid #2563eb; display: flex; flex-direction: column; gap: 8px; }
+      .c-name { font-weight: bold; font-size: 18px; color: #111827; }
+      .c-code { display: inline-block; background: #eef2ff; color: #3730a3; padding: 4px 10px; border-radius: 6px; font-weight: bold; letter-spacing: 1px; }
+      .c-desc { color: #6b7280; font-size: 14px; }
+      .btn { margin-top: 8px; text-align: center; background: #2563eb; color: #fff; padding: 10px; border-radius: 10px; text-decoration: none; font-weight: bold; border: none; cursor: pointer; }
+      .btn-done { background: #9ca3af; cursor: default; }
+      .empty { color: #6b7280; }
+    </style>
+  </head>
+  <body>
+    {% include 'main/partials/navbar.html' %}
+    <div class="container">
+      <h1>可領取的優惠券</h1>
+      {% if coupons %}
+      <div class="grid">
+        {% for c in coupons %}
+        <div class="coupon">
+          <div class="c-name">{{ c.name }}</div>
+          <span class="c-code">{{ c.code }}</span>
+          <div class="c-desc">
+            {% if c.discount_type == 'amount' %}折抵 NT$ {{ c.discount_value }}{% else %}打 {{ c.discount_value }}% 折扣{% endif %}
+            ・ 最低消費 NT$ {{ c.min_spend }}<br />
+            使用期限：{{ c.end_date|date:"Y-m-d" }}
+          </div>
+          {% if c.id in claimed_ids %}
+          <span class="btn btn-done">已領取</span>
+          {% else %}
+          <form method="post" action="{% url 'claim_coupon' c.id %}">
+            {% csrf_token %}
+            <button type="submit" class="btn" style="width:100%;">立即領取</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty">目前沒有可領取的優惠券。</p>
+      {% endif %}
+    </div>
+  </body>
+</html>
