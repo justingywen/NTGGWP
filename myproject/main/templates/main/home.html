@@ -1,484 +1,495 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>我的線上課程平台</title>
+    <title>Course Platform ｜ 找到適合你的線上課程</title>
     <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
+      /* ===== 設計變數（改色只需動這裡） ===== */
+      :root {
+        --brand: #4f46e5;
+        --brand-2: #7c3aed;
+        --brand-soft: #eef2ff;
+        --ink: #0f172a;
+        --ink-soft: #475569;
+        --muted: #94a3b8;
+        --line: #e2e8f0;
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --radius: 20px;
+        --shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+        --shadow-hover: 0 20px 44px rgba(79, 70, 229, 0.18);
       }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
 
       body {
-        font-family: "Microsoft JhengHei", sans-serif;
-        background: #f7f8fb;
-        color: #1f2937;
+        font-family: "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
       }
+      a { text-decoration: none; color: inherit; }
+      img { display: block; max-width: 100%; }
 
-      a {
-        text-decoration: none;
-      }
+      .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
-      .navbar {
-        width: 100%;
-        background: #ffffff;
-        border-bottom: 1px solid #e5e7eb;
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-      }
-
-      .nav-inner {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 18px 24px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .logo {
-        font-size: 24px;
-        font-weight: bold;
-        color: #111827;
-      }
-
-      .nav-menu {
-        display: flex;
-        gap: 24px;
-        align-items: center;
-      }
-
-      .nav-menu a {
-        color: #374151;
-        font-size: 15px;
-      }
-
-      .nav-btn {
-        background: #2563eb;
-        color: white !important;
-        padding: 10px 18px;
-        border-radius: 999px;
-        font-weight: bold;
-      }
-
+      /* ===== Hero ===== */
       .hero {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 70px 24px 50px;
-        display: grid;
-        grid-template-columns: 1.15fr 0.85fr;
-        gap: 36px;
-        align-items: center;
+        position: relative;
+        overflow: hidden;
+        background: radial-gradient(circle at 15% 20%, #6d28d9, transparent 45%),
+                    radial-gradient(circle at 85% 15%, #4338ca, transparent 40%),
+                    linear-gradient(135deg, #1e1b4b, #312e81);
+        color: #fff;
       }
-
-      .hero-text h1 {
-        font-size: 48px;
-        line-height: 1.25;
+      .hero-inner { padding: 96px 24px 88px; text-align: center; }
+      .hero-badge {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 8px 18px;
+        border-radius: 999px;
+        font-size: 14px;
+        letter-spacing: 0.5px;
+        margin-bottom: 24px;
+      }
+      .hero h1 {
+        font-size: 52px;
+        line-height: 1.2;
+        font-weight: 800;
         margin-bottom: 20px;
-        color: #111827;
+        letter-spacing: -1px;
       }
-
-      .hero-text p {
-        font-size: 18px;
-        color: #4b5563;
-        line-height: 1.9;
-        margin-bottom: 14px;
+      .hero h1 .grad {
+        background: linear-gradient(90deg, #a5b4fc, #f0abfc);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
       }
-
-      .hero-actions {
-        margin-top: 28px;
+      .hero p {
+        font-size: 19px;
+        color: #c7d2fe;
+        max-width: 620px;
+        margin: 0 auto 36px;
+        line-height: 1.8;
+      }
+      /* 搜尋列：即時前端篩選課程卡 */
+      .search-bar {
         display: flex;
-        gap: 14px;
+        gap: 10px;
+        max-width: 560px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 8px;
+        border-radius: 999px;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+      }
+      .search-bar input {
+        flex: 1;
+        border: none;
+        outline: none;
+        padding: 0 18px;
+        font-size: 16px;
+        color: var(--ink);
+        background: transparent;
+      }
+      .search-bar button {
+        border: none;
+        cursor: pointer;
+        background: linear-gradient(135deg, var(--brand), var(--brand-2));
+        color: #fff;
+        font-weight: 700;
+        font-size: 16px;
+        padding: 12px 26px;
+        border-radius: 999px;
+      }
+      .hero-stats {
+        display: flex;
+        justify-content: center;
+        gap: 44px;
+        margin-top: 44px;
         flex-wrap: wrap;
       }
+      .hero-stats .num { font-size: 30px; font-weight: 800; }
+      .hero-stats .lbl { font-size: 14px; color: #a5b4fc; margin-top: 4px; }
 
-      .btn-primary {
-        display: inline-block;
-        background: #2563eb;
-        color: white;
-        padding: 14px 24px;
-        border-radius: 12px;
-        font-weight: bold;
+      /* ===== 區塊通用 ===== */
+      .section { padding: 68px 0 8px; }
+      .section-head { margin-bottom: 32px; }
+      .section-head .eyebrow {
+        color: var(--brand);
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 1px;
       }
-
-      .btn-secondary {
-        display: inline-block;
-        background: white;
-        color: #2563eb;
-        border: 1px solid #cbd5e1;
-        padding: 14px 24px;
-        border-radius: 12px;
-        font-weight: bold;
+      .section-head h2 {
+        font-size: 34px;
+        font-weight: 800;
+        margin: 8px 0 10px;
+        letter-spacing: -0.5px;
       }
+      .section-head p { color: var(--ink-soft); font-size: 16px; line-height: 1.8; max-width: 640px; }
 
-      .hero-card {
-        background: linear-gradient(135deg, #2563eb, #60a5fa);
-        border-radius: 28px;
-        min-height: 360px;
-        color: white;
-        padding: 36px;
+      /* ===== 特色卡 ===== */
+      .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+      .feature {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 28px;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .feature:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+      .feature .ico {
+        width: 52px; height: 52px;
+        display: grid; place-items: center;
+        border-radius: 14px;
+        background: var(--brand-soft);
+        font-size: 26px;
+        margin-bottom: 16px;
+      }
+      .feature h3 { font-size: 20px; margin-bottom: 10px; }
+      .feature p { color: var(--ink-soft); line-height: 1.8; font-size: 15px; }
+
+      /* ===== 分類 chips ===== */
+      .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 28px; }
+      .chip {
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--ink-soft);
+        padding: 8px 18px;
+        border-radius: 999px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.15s;
+      }
+      .chip:hover { border-color: var(--brand); color: var(--brand); }
+      .chip.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+      /* ===== 課程卡 ===== */
+      .courses { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+      .course-card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
-        box-shadow: 0 18px 40px rgba(37, 99, 235, 0.18);
       }
-
-      .hero-card-top {
-        font-size: 15px;
-        opacity: 0.9;
+      .course-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-hover); }
+      .course-thumb {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        background: linear-gradient(135deg, var(--brand-soft), #f3e8ff);
+        overflow: hidden;
       }
-
-      .hero-card-center {
-        font-size: 34px;
-        font-weight: bold;
-        line-height: 1.5;
+      .course-thumb img { width: 100%; height: 100%; object-fit: cover; }
+      .course-thumb .ph {
+        position: absolute; inset: 0;
+        display: grid; place-items: center;
+        color: var(--brand);
+        font-size: 40px;
+        font-weight: 800;
+        opacity: 0.4;
       }
-
-      .hero-card-bottom {
-        font-size: 15px;
-        opacity: 0.95;
+      .badge {
+        position: absolute;
+        top: 12px; left: 12px;
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--brand);
+        font-size: 12px;
+        font-weight: 700;
+        padding: 5px 12px;
+        border-radius: 999px;
+        backdrop-filter: blur(4px);
       }
-
-      .section {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 40px 24px 10px;
-      }
-
-      .section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: end;
-        margin-bottom: 24px;
-        gap: 20px;
-        flex-wrap: wrap;
-      }
-
-      .section-title {
-        font-size: 34px;
-        color: #111827;
-        margin-bottom: 8px;
-      }
-
-      .section-desc {
-        color: #6b7280;
-        line-height: 1.8;
-        font-size: 16px;
-      }
-
-      .cards {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 24px;
-      }
-
-      .feature-card,
-      .course-card,
-      .placeholder-card {
-        background: white;
-        border-radius: 22px;
-        padding: 24px;
-        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
-      }
-
-      .feature-card h3,
-      .course-card h3,
-      .placeholder-card h3 {
-        font-size: 24px;
+      .course-body { padding: 20px; display: flex; flex-direction: column; flex: 1; }
+      .course-cat { color: var(--brand); font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+      .course-body h3 { font-size: 18px; line-height: 1.5; margin-bottom: 10px; }
+      .course-body .desc {
+        color: var(--ink-soft);
+        font-size: 14px;
+        line-height: 1.7;
         margin-bottom: 14px;
-        color: #111827;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
       }
-
-      .feature-card p,
-      .course-card p,
-      .placeholder-card p {
-        color: #6b7280;
-        line-height: 1.8;
-        font-size: 16px;
+      .course-teacher { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 14px; margin-bottom: 14px; }
+      .avatar {
+        width: 28px; height: 28px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--brand), var(--brand-2));
+        color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700;
       }
-
-      .course-link {
-        text-decoration: none;
-        color: inherit;
-        display: block;
-      }
-
-      .course-card {
-        transition:
-          transform 0.2s ease,
-          box-shadow 0.2s ease;
-      }
-
-      .course-link:hover .course-card {
-        transform: translateY(-6px);
-        box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
-      }
-
-      .course-img {
-        width: 100%;
-        height: 190px;
-        object-fit: cover;
-        border-radius: 16px;
-        margin-bottom: 18px;
-        background: #e5e7eb;
-      }
-
-      .teacher {
-        margin: 10px 0 8px;
-        color: #4b5563 !important;
-      }
-
-      .price {
-        margin-top: 14px;
-        font-size: 24px;
-        font-weight: bold;
-        color: #2563eb;
-      }
-
-      .placeholder-box {
-        margin-top: 20px;
-        background: #f3f4f6;
-        border: 2px dashed #cbd5e1;
-        border-radius: 18px;
-        min-height: 220px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        color: #64748b;
-        padding: 24px;
-        line-height: 1.8;
-      }
-
-      .footer {
-        margin-top: 70px;
-        background: #111827;
-        color: #d1d5db;
-      }
-
-      .footer-inner {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 28px 24px;
+      .course-foot {
+        margin-top: auto;
         display: flex;
         justify-content: space-between;
-        gap: 20px;
-        flex-wrap: wrap;
+        align-items: center;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+      }
+      .price { font-size: 22px; font-weight: 800; color: var(--ink); }
+      .price small { font-size: 13px; color: var(--muted); font-weight: 600; }
+      .go { color: var(--brand); font-weight: 700; font-size: 14px; }
+      .empty-state {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--muted);
+        border: 2px dashed var(--line);
+        border-radius: var(--radius);
       }
 
-      .footer-title {
-        color: white;
-        font-weight: bold;
-        margin-bottom: 8px;
+      /* ===== 佔位區（Power BI / AI） ===== */
+      .placeholders { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+      .ph-card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 28px;
+      }
+      .ph-card h3 { font-size: 20px; margin-bottom: 8px; }
+      .ph-card > p { color: var(--ink-soft); font-size: 15px; line-height: 1.8; margin-bottom: 18px; }
+      .ph-box {
+        border: 2px dashed var(--line);
+        border-radius: 14px;
+        min-height: 180px;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        color: var(--muted);
+        background: var(--bg);
+        padding: 20px;
+        line-height: 1.9;
       }
 
-      @media (max-width: 900px) {
-        .hero {
-          grid-template-columns: 1fr;
-        }
-
-        .hero-text h1 {
-          font-size: 38px;
-        }
-
-        .hero-card {
-          min-height: 260px;
-        }
-
-        .section-title {
-          font-size: 28px;
-        }
+      /* ===== CTA ===== */
+      .cta {
+        margin: 72px 0 0;
+        background: linear-gradient(135deg, var(--brand), var(--brand-2));
+        border-radius: 28px;
+        padding: 56px 40px;
+        text-align: center;
+        color: #fff;
+      }
+      .cta h2 { font-size: 32px; font-weight: 800; margin-bottom: 12px; }
+      .cta p { color: #e0e7ff; font-size: 17px; margin-bottom: 28px; }
+      .cta a {
+        display: inline-block;
+        background: #fff;
+        color: var(--brand);
+        font-weight: 800;
+        padding: 15px 34px;
+        border-radius: 999px;
       }
 
-      @media (max-width: 600px) {
-        .nav-inner {
-          flex-direction: column;
-          gap: 14px;
-          align-items: flex-start;
-        }
+      /* ===== Footer ===== */
+      .footer { margin-top: 72px; background: var(--ink); color: #cbd5e1; }
+      .footer-inner { padding: 44px 24px 32px; display: flex; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+      .footer-title { color: #fff; font-weight: 700; margin-bottom: 12px; }
+      .footer a { display: block; color: #94a3b8; font-size: 14px; line-height: 2.2; }
+      .footer a:hover { color: #fff; }
+      .footer-bottom { border-top: 1px solid #1e293b; padding: 18px 24px; text-align: center; font-size: 13px; color: #64748b; }
 
-        .nav-menu {
-          flex-wrap: wrap;
-          gap: 14px;
-        }
-
-        .hero {
-          padding-top: 40px;
-        }
-
-        .hero-text h1 {
-          font-size: 32px;
-        }
-
-        .hero-text p {
-          font-size: 16px;
-        }
-
-        .hero-card-center {
-          font-size: 28px;
-        }
+      /* ===== RWD ===== */
+      @media (max-width: 768px) {
+        .hero-inner { padding: 68px 24px 60px; }
+        .hero h1 { font-size: 36px; }
+        .hero p { font-size: 16px; }
+        .section-head h2 { font-size: 28px; }
+        .placeholders { grid-template-columns: 1fr; }
+        .search-bar button { padding: 12px 18px; }
+      }
+      @media (max-width: 480px) {
+        .hero h1 { font-size: 30px; }
+        .hero-stats { gap: 28px; }
+        .cta { padding: 40px 24px; }
       }
     </style>
   </head>
   <body>
     {% include 'main/partials/navbar.html' %}
-    <div class="hero">
-      <div class="hero-text">
-        <h1>找到適合你的<br />線上課程與學習方式</h1>
-        <p>結合課程平台、數據分析與智慧推薦，打造更直覺的學習體驗。</p>
-        <p>
-          本專題以 Hahow
-          類型的平台功能為核心，並以更清楚、直觀的版面風格作為設計方向。
-        </p>
-        <div class="hero-actions">
-          <a href="#course-section" class="btn-primary">立即探索課程</a>
-          <a href="#powerbi-section" class="btn-secondary">查看分析專區</a>
+
+    <!-- ===== Hero + 即時搜尋 ===== -->
+    <header class="hero">
+      <div class="hero-inner">
+        <span class="hero-badge">🚀 新一代線上學習平台</span>
+        <h1>找到適合你的<br /><span class="grad">線上課程與學習方式</span></h1>
+        <p>結合課程平台、數據分析與 AI 智慧推薦，打造比 Hahow 更直覺、更流暢的學習體驗。</p>
+        <div class="search-bar">
+          <input id="searchInput" type="text" placeholder="搜尋課程、講師或關鍵字…" />
+          <button type="button" onclick="document.getElementById('course-section').scrollIntoView()">搜尋</button>
+        </div>
+        <div class="hero-stats">
+          <div><div class="num">{{ courses|length }}+</div><div class="lbl">上架課程</div></div>
+          <div><div class="num">100%</div><div class="lbl">後台動態管理</div></div>
+          <div><div class="num">24/7</div><div class="lbl">隨時開始學習</div></div>
         </div>
       </div>
+    </header>
 
-      <div class="hero-card">
-        <div class="hero-card-top">線上學習平台專題</div>
-        <div class="hero-card-center">
-          課程瀏覽<br />
-          購課流程<br />
-          數據分析<br />
-          AI 擴充預留
-        </div>
-        <div class="hero-card-bottom">Hahow 功能邏輯 × 直覺式平台排版</div>
+    <!-- ===== 平台特色 ===== -->
+    <section class="section wrap">
+      <div class="section-head">
+        <div class="eyebrow">WHY CHOOSE US</div>
+        <h2>為什麼選擇我們</h2>
+        <p>以清楚的資訊區塊與容易理解的操作流程，讓使用者更快找到需要的課程與服務。</p>
       </div>
-    </div>
-
-    <div class="section">
-      <div class="section-header">
-        <div>
-          <div class="section-title">平台特色</div>
-          <div class="section-desc">
-            以清楚的資訊區塊與容易理解的操作流程，讓使用者更快找到需要的課程與服務。
-          </div>
-        </div>
+      <div class="features">
+        <div class="feature"><div class="ico">📚</div><h3>豐富課程管理</h3><p>課程名稱、講師、價格、封面與難度分級，皆可透過後台快速維護與同步。</p></div>
+        <div class="feature"><div class="ico">👤</div><h3>完整會員系統</h3><p>註冊、登入、個人中心、購課紀錄與我的課程，建立完整學習流程。</p></div>
+        <div class="feature"><div class="ico">📊</div><h3>數據分析專區</h3><p>課程熱度、購課趨勢與學習行為，預留 Power BI 儀表板整合位置。</p></div>
+        <div class="feature"><div class="ico">🤖</div><h3>AI 智慧擴充</h3><p>預留 AI 推薦、學習建議與問答助理模組，未來可無痛接入模型與 API。</p></div>
       </div>
+    </section>
 
-      <div class="cards">
-        <div class="feature-card">
-          <h3>課程管理</h3>
-          <p>
-            可展示課程名稱、課程介紹、講師資訊、價格與封面圖片，並透過後台快速維護課程內容。
-          </p>
-        </div>
-        <div class="feature-card">
-          <h3>會員功能</h3>
-          <p>
-            未來可擴充註冊、登入、個人資料、購課紀錄與我的課程等功能，建立完整學習流程。
-          </p>
-        </div>
-        <div class="feature-card">
-          <h3>後台系統</h3>
-          <p>
-            管理員可透過 Django
-            後台新增課程、修改內容、上傳圖片，並作為後續訂單管理的基礎。
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div class="section" id="course-section">
-      <div class="section-header">
-        <div>
-          <div class="section-title">精選課程</div>
-          <div class="section-desc">
-            以下課程內容由後台動態管理，新增或修改資料後，首頁會自動同步更新。
-          </div>
-        </div>
+    <!-- ===== 精選課程（分類篩選 + 搜尋） ===== -->
+    <section class="section wrap" id="course-section">
+      <div class="section-head">
+        <div class="eyebrow">EXPLORE COURSES</div>
+        <h2>精選課程</h2>
+        <p>課程內容由後台動態管理，可用上方搜尋列或下方分類即時篩選。</p>
       </div>
 
-      <div class="cards">
+      <!-- 分類 chips：由課程資料動態去重產生 -->
+      <div class="chips" id="chips">
+        <button class="chip active" data-cat="all">全部</button>
+        {% for course in courses %}{% if course.category %}
+        <button class="chip" data-cat="{{ course.category.name }}" data-once="{{ course.category.name }}">{{ course.category.name }}</button>
+        {% endif %}{% endfor %}
+      </div>
+
+      <div class="courses" id="courseGrid">
         {% for course in courses %}
-        <a href="{% url 'course_detail' course.id %}" class="course-link">
-          <div class="course-card">
+        <!-- 課程卡：data-* 供前端搜尋/篩選使用 -->
+        <a href="{% url 'course_detail' course.id %}" class="course-card"
+           data-title="{{ course.title|lower }}"
+           data-teacher="{{ course.teacher|lower }}"
+           data-cat="{% if course.category %}{{ course.category.name }}{% else %}未分類{% endif %}">
+          <div class="course-thumb">
             {% if course.image %}
-            <img
-              src="{{ course.image.url }}"
-              alt="{{ course.title }}"
-              class="course-img"
-            />
+            <img src="{{ course.image.url }}" alt="{{ course.title }}" loading="lazy" />
+            {% else %}
+            <div class="ph">{{ course.title|slice:":1" }}</div>
             {% endif %}
+            <span class="badge">{{ course.get_level_display }}</span>
+          </div>
+          <div class="course-body">
+            {% if course.category %}<div class="course-cat">{{ course.category.name }}</div>{% endif %}
             <h3>{{ course.title }}</h3>
-            <p class="teacher"><strong>講師：</strong>{{ course.teacher }}</p>
-            <p>{{ course.description }}</p>
-            <div class="price">NT$ {{ course.price }}</div>
+            <p class="desc">{{ course.description }}</p>
+            <div class="course-teacher">
+              <span class="avatar">{{ course.teacher.username|slice:":1"|upper }}</span>
+              {{ course.teacher.username }}
+            </div>
+            <div class="course-foot">
+              <div class="price"><small>NT$</small> {{ course.price }}</div>
+              <span class="go">查看課程 →</span>
+            </div>
           </div>
         </a>
         {% empty %}
-        <div class="course-card">
-          <h3>目前還沒有課程</h3>
-          <p>請先到後台新增課程資料。</p>
-        </div>
+        <div class="empty-state"><h3>目前還沒有課程</h3><p>請先到後台新增課程資料。</p></div>
         {% endfor %}
+        <!-- 無搜尋結果時由 JS 顯示 -->
+        <div class="empty-state" id="noResult" style="display:none;">找不到符合的課程，換個關鍵字試試 🔍</div>
       </div>
-    </div>
+    </section>
 
-    <div class="section" id="powerbi-section">
-      <div class="section-header">
-        <div>
-          <div class="section-title">Power BI 分析專區</div>
-          <div class="section-desc">
-            此區塊預留給課程熱度、購課趨勢、學習行為分析等資料視覺化內容，後續可整合
-            Power BI 儀表板。
-          </div>
+    <!-- ===== Power BI / AI 佔位區 ===== -->
+    <section class="section wrap" id="powerbi-section">
+      <div class="section-head">
+        <div class="eyebrow">ANALYTICS &amp; AI</div>
+        <h2>數據分析 × AI 智慧專區</h2>
+        <p>預留資料視覺化與 AI 功能位置，後續可依專題需求整合報表與模型。</p>
+      </div>
+      <div class="placeholders">
+        <div class="ph-card">
+          <h3>📊 Power BI Dashboard</h3>
+          <p>預留課程熱度、購課趨勢、學習行為分析等視覺化內容。</p>
+          <div class="ph-box">這裡預留給 Power BI 內容<br />可放 iframe、嵌入報表或統計摘要卡片</div>
+        </div>
+        <div class="ph-card" id="ai-section">
+          <h3>🤖 AI 智慧助理</h3>
+          <p>預留 AI 課程推薦、學習建議與問答互動功能。</p>
+          <div class="ph-box">這裡預留給 AI 功能<br />可放聊天視窗、推薦結果或 AI 問答區</div>
         </div>
       </div>
+    </section>
 
-      <div class="placeholder-card">
-        <h3>Power BI Dashboard Placeholder</h3>
-        <p>
-          目前先保留分析模組位置，之後可依專題需求嵌入報表、互動圖表或數據摘要卡片。
-        </p>
-        <div class="placeholder-box">
-          這裡預留給 Power BI 內容<br />
-          可放 iframe、嵌入報表、統計摘要或分析截圖
-        </div>
+    <!-- ===== CTA ===== -->
+    <section class="wrap">
+      <div class="cta">
+        <h2>準備好開始你的學習旅程了嗎？</h2>
+        <p>立即註冊，探索由後台動態管理的精選課程。</p>
+        <a href="{% url 'register' %}">免費註冊 →</a>
       </div>
-    </div>
+    </section>
 
-    <div class="section" id="ai-section">
-      <div class="section-header">
-        <div>
-          <div class="section-title">AI 智慧功能專區</div>
-          <div class="section-desc">
-            此區塊預留給 AI
-            課程推薦、學習建議、問答助理或聊天互動功能，後續可再依需求接入模型與
-            API。
-          </div>
-        </div>
-      </div>
-
-      <div class="placeholder-card">
-        <h3>AI Feature Placeholder</h3>
-        <p>
-          目前先保留 AI
-          模組位置，未來可擴充成智慧助理、推薦系統、關鍵字問答或個人化學習建議。
-        </p>
-        <div class="placeholder-box">
-          這裡預留給 AI 功能<br />
-          可放聊天視窗、推薦結果、AI 問答區或提示卡片
-        </div>
-      </div>
-    </div>
-
-    <div class="footer">
+    <!-- ===== Footer ===== -->
+    <footer class="footer">
       <div class="footer-inner">
         <div>
           <div class="footer-title">Course Platform</div>
-          <div>線上課程平台專題展示頁面</div>
+          <div style="color:#94a3b8;font-size:14px;max-width:260px;line-height:1.9;">新一代線上課程平台專題，整合會員、購課、數據分析與 AI。</div>
         </div>
         <div>
-          <div class="footer-title">後續擴充方向</div>
-          <div>會員系統 / 購課流程 / Power BI / AI 助理</div>
+          <div class="footer-title">課程</div>
+          <a href="{% url 'home' %}#course-section">課程總覽</a>
+          <a href="{% url 'home' %}#powerbi-section">數據分析</a>
+          <a href="{% url 'home' %}#ai-section">AI 助理</a>
+        </div>
+        <div>
+          <div class="footer-title">帳戶</div>
+          <a href="{% url 'login' %}">登入</a>
+          <a href="{% url 'register' %}">註冊</a>
         </div>
       </div>
-    </div>
+      <div class="footer-bottom">© 2026 Course Platform. 線上課程平台專題展示。</div>
+    </footer>
+
+    <script>
+      // ===== 前端即時搜尋 + 分類篩選（不動後端） =====
+      const input = document.getElementById("searchInput");
+      const cards = [...document.querySelectorAll(".course-card")];
+      const noResult = document.getElementById("noResult");
+      const chips = document.getElementById("chips");
+      let activeCat = "all";
+
+      // 移除重複的分類 chip（同名只留一個）
+      const seen = new Set();
+      chips.querySelectorAll("[data-once]").forEach((b) => {
+        if (seen.has(b.dataset.once)) b.remove();
+        else seen.add(b.dataset.once);
+      });
+
+      function applyFilter() {
+        const kw = (input.value || "").trim().toLowerCase();
+        let shown = 0;
+        cards.forEach((c) => {
+          const matchKw = !kw || c.dataset.title.includes(kw) || c.dataset.teacher.includes(kw);
+          const matchCat = activeCat === "all" || c.dataset.cat === activeCat;
+          const ok = matchKw && matchCat;
+          c.style.display = ok ? "flex" : "none";
+          if (ok) shown++;
+        });
+        noResult.style.display = shown === 0 ? "block" : "none";
+      }
+
+      input.addEventListener("input", applyFilter);
+      chips.addEventListener("click", (e) => {
+        const btn = e.target.closest(".chip");
+        if (!btn) return;
+        chips.querySelectorAll(".chip").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        activeCat = btn.dataset.cat;
+        applyFilter();
+      });
+    </script>
   </body>
 </html>
