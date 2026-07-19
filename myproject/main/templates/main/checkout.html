@@ -126,7 +126,21 @@
           <form method="post">
             {% csrf_token %}
             <label for="id_coupon_code"><strong>優惠碼</strong></label>
-            {{ form.coupon_code }} {% if success_message %}
+            {{ form.coupon_code }}
+
+            {% if my_coupons %}
+            <div style="margin-top:12px;">
+              <div style="font-size:14px; color:#6b7280; margin-bottom:6px;">我領取的優惠券（點選自動填入）：</div>
+              {% for uc in my_coupons %}
+              <button type="button"
+                onclick="document.getElementById('id_coupon_code').value='{{ uc.coupon.code }}';"
+                style="background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; padding:6px 12px; border-radius:8px; margin:3px; cursor:pointer; font-weight:bold;">
+                {{ uc.coupon.code }}（{{ uc.coupon.name }}）
+              </button>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if success_message %}
             <div class="message-success">{{ success_message }}</div>
             {% endif %} {% if error_message %}
             <div class="message-error">{{ error_message }}</div>

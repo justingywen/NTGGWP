@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>通知中心</title>
+    <style>
+      body { font-family: "Microsoft JhengHei", sans-serif; background: #f5f7fb; margin: 0; color: #222; }
+      .container { max-width: 760px; margin: 0 auto; padding: 40px 20px; }
+      .card { background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,.06); }
+      .head { display: flex; justify-content: space-between; align-items: center; }
+      h1 { color: #111827; margin: 0; }
+      .btn { background: #2563eb; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+      .note { border-left: 4px solid #d1d5db; padding: 14px 16px; margin-top: 14px; border-radius: 8px; background: #f9fafb; }
+      .note.unread { border-left-color: #2563eb; background: #eff6ff; }
+      .n-title { font-weight: bold; color: #111827; }
+      .n-content { color: #4b5563; margin-top: 4px; }
+      .n-time { color: #9ca3af; font-size: 13px; margin-top: 6px; }
+      .dot { display: inline-block; width: 8px; height: 8px; background: #2563eb; border-radius: 50%; margin-right: 6px; }
+      .empty { color: #6b7280; }
+    </style>
+  </head>
+  <body>
+    {% include 'main/partials/navbar.html' %}
+    <div class="container">
+      <div class="card">
+        <div class="head">
+          <h1>通知中心</h1>
+          <form method="post" action="{% url 'mark_notifications_read' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn">全部標為已讀</button>
+          </form>
+        </div>
+        {% if notifications %}
+          {% for n in notifications %}
+          <div class="note {% if not n.is_read %}unread{% endif %}">
+            <div class="n-title">{% if not n.is_read %}<span class="dot"></span>{% endif %}{{ n.title }}</div>
+            <div class="n-content">{{ n.content }}</div>
+            <div class="n-time">{{ n.created_at|date:"Y-m-d H:i" }}</div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="empty" style="margin-top:16px;">目前沒有任何通知。</p>
+        {% endif %}
+      </div>
+    </div>
+  </body>
+</html>

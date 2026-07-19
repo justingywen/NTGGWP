@@ -27,9 +27,23 @@ from .models import (
     Favorite,
     Refund,
     UserCoupon,
+    CourseChapter,
+    CourseQuestion,
+    CourseAnswer,
+    CourseAudit,
+    Promotion,
 )
 
-from .forms import RegisterForm, CourseForm, CouponApplyForm, ReviewForm
+from .forms import (
+    RegisterForm,
+    CourseForm,
+    CouponApplyForm,
+    ReviewForm,
+    ChapterForm,
+    LessonForm,
+    QuestionForm,
+    AnswerForm,
+)
 
 
 def home(request):
@@ -108,6 +122,13 @@ def course_detail(request, course_id):
 
     review_count = reviews.count()
 
+    # A7：課程問答
+    questions = CourseQuestion.objects.filter(
+        course=course
+    ).select_related('user').prefetch_related('answers__user').order_by('-created_at')
+
+    is_course_teacher = request.user.is_authenticated and course.teacher_id == request.user.id
+
     return render(request, 'main/course_detail.html', {
         'course': course,
         'already_purchased': already_purchased,
@@ -119,6 +140,10 @@ def course_detail(request, course_id):
         'my_review': my_review,
         'review_form': review_form,
         'is_favorited': is_favorited,
+        'questions': questions,
+        'question_form': QuestionForm(),
+        'answer_form': AnswerForm(),
+        'is_course_teacher': is_course_teacher,
     })
 
 
@@ -435,6 +460,13 @@ def checkout(request, course_id):
                     discount_amount=discount_amount
                 )
 
+                # A4：若這張券是使用者領取的，標記為已使用
+                UserCoupon.objects.filter(
+                    user=request.user,
+                    coupon=coupon,
+                    status='unused'
+                ).update(status='used', used_at=timezone.now())
+
             Notification.objects.create(
                 user=request.user,
                 title='購買成功通知',
@@ -442,6 +474,16 @@ def checkout(request, course_id):
             )
 
             return redirect('order_success', order_id=order.id)
+
+    # A4：帶出使用者可用的優惠券供選擇
+    now = timezone.now()
+    my_coupons = UserCoupon.objects.filter(
+        user=request.user, status='unused'
+    ).select_related('coupon').filter(
+        coupon__is_active=True,
+        coupon__start_date__lte=now,
+        coupon__end_date__gte=now,
+    )
 
     return render(request, 'main/checkout.html', {
         'course': course,
@@ -451,6 +493,7 @@ def checkout(request, course_id):
         'final_price': final_price,
         'error_message': error_message,
         'success_message': success_message,
+        'my_coupons': my_coupons,
     })
 
 
@@ -519,7 +562,16 @@ def create_course(request):
         if form.is_valid():
             course = form.save(commit=False)
             course.teacher = request.user
+            course.is_published = False  # A8：送審前不上架
             course.save()
+
+            CourseAudit.objects.create(course=course, status='pending')
+
+            Notification.objects.create(
+                user=request.user,
+                title='課程已送審',
+                content=f'你的課程「{course.title}」已送出審核，通過後才會上架。'
+            )
 
             return redirect('teacher_dashboard')
 
@@ -1172,29 +1224,73 @@ def remove_from_cart(request, item_id):
 @login_required
 def cart_checkout(request):
     cart, _ = Cart.objects.get_or_create(user=request.user)
-    items = cart.items.select_related('course').all()
+    items = list(cart.items.select_related('course').all())
+    now = timezone.now()
 
-    created_count = 0
+    # A5：有效促銷 → course_id 對應 Promotion
+    promo_map = {}
+    active_promos = Promotion.objects.filter(
+        is_active=True, start_date__lte=now, end_date__gte=now
+    ).prefetch_related('courses')
+    for promo in active_promos:
+        for c in promo.courses.all():
+            promo_map.setdefault(c.id, promo)
+
+    # A5：整車套用一張優惠券（依購物車總額計算，逐筆分攤）
+    coupon = None
+    if request.method == 'POST':
+        code = request.POST.get('coupon_code', '').strip()
+        if code:
+            coupon = Coupon.objects.filter(code__iexact=code).first()
+            if coupon and not coupon.is_valid_now():
+                coupon = None
+
+    cart_total = sum(i.course.price for i in items)
+    coupon_remaining = coupon.calculate_discount(cart_total) if coupon else 0
+    coupon_used_total = 0
 
     for item in items:
         course = item.course
-
         if Enrollment.objects.filter(student=request.user, course=course).exists():
             continue
+
+        original = course.price
+        discount = 0
+
+        # 促銷折扣
+        promo = promo_map.get(course.id)
+        if promo:
+            if promo.discount_type == 'amount':
+                discount += min(promo.discount_value, original)
+            else:
+                discount += int(original * promo.discount_value / 100)
+
+        price_after_promo = original - discount
+
+        # 優惠券分攤
+        coupon_here = 0
+        if coupon_remaining > 0 and price_after_promo > 0:
+            coupon_here = min(coupon_remaining, price_after_promo)
+            discount += coupon_here
+            coupon_remaining -= coupon_here
+            coupon_used_total += coupon_here
+
+        final_price = original - discount
 
         order = Order.objects.create(
             user=request.user,
             course=course,
-            original_price=course.price,
-            discount_amount=0,
-            final_price=course.price,
+            coupon=coupon if coupon_here > 0 else None,
+            original_price=original,
+            discount_amount=discount,
+            final_price=final_price,
             status='paid'
         )
-        OrderItem.objects.create(order=order, course=course, price=course.price)
+        OrderItem.objects.create(order=order, course=course, price=original)
         Payment.objects.create(
             order=order,
             method='mock',
-            amount=course.price,
+            amount=final_price,
             status='paid',
             transaction_no=f'MOCK-{order.id:05d}',
             paid_at=order.created_at
@@ -1203,9 +1299,18 @@ def cart_checkout(request):
         Notification.objects.create(
             user=request.user,
             title='購買成功通知',
-            content=f'你已成功購買「{course.title}」，實付金額 NT$ {course.price}。'
+            content=f'你已成功購買「{course.title}」，實付金額 NT$ {final_price}。'
         )
-        created_count += 1
+        if coupon_here > 0:
+            CouponUsage.objects.create(
+                user=request.user, coupon=coupon, order=order, discount_amount=coupon_here
+            )
+
+    # 券有實際使用才標記為已用
+    if coupon and coupon_used_total > 0:
+        UserCoupon.objects.filter(
+            user=request.user, coupon=coupon, status='unused'
+        ).update(status='used', used_at=now)
 
     cart.items.all().delete()
 
@@ -1339,3 +1444,346 @@ def my_coupons(request):
     return render(request, 'main/my_coupons.html', {
         'user_coupons': user_coupons,
     })
+
+
+# =========================
+# A2 章節 / 單元管理（老師）
+# =========================
+
+def _require_course_teacher(request, course_id):
+    """回傳 (course, None) 或 (None, redirect)。只有課程講師本人可管理。"""
+    try:
+        profile = request.user.profile
+    except Profile.DoesNotExist:
+        return None, redirect('home')
+
+    if profile.role != 'teacher':
+        return None, redirect('home')
+
+    course = get_object_or_404(Course, id=course_id, teacher=request.user)
+    return course, None
+
+
+@login_required
+def manage_content(request, course_id):
+    course, redirect_resp = _require_course_teacher(request, course_id)
+    if redirect_resp:
+        return redirect_resp
+
+    chapters = course.chapters.prefetch_related('lessons').all()
+
+    return render(request, 'main/manage_content.html', {
+        'course': course,
+        'chapters': chapters,
+        'chapter_form': ChapterForm(),
+        'lesson_form': LessonForm(),
+    })
+
+
+@login_required
+def add_chapter(request, course_id):
+    course, redirect_resp = _require_course_teacher(request, course_id)
+    if redirect_resp:
+        return redirect_resp
+
+    if request.method == 'POST':
+        form = ChapterForm(request.POST)
+        if form.is_valid():
+            chapter = form.save(commit=False)
+            chapter.course = course
+            chapter.save()
+
+    return redirect('manage_content', course_id=course.id)
+
+
+@login_required
+def edit_chapter(request, chapter_id):
+    chapter = get_object_or_404(CourseChapter, id=chapter_id)
+    course, redirect_resp = _require_course_teacher(request, chapter.course_id)
+    if redirect_resp:
+        return redirect_resp
+
+    if request.method == 'POST':
+        form = ChapterForm(request.POST, instance=chapter)
+        if form.is_valid():
+            form.save()
+            return redirect('manage_content', course_id=course.id)
+    else:
+        form = ChapterForm(instance=chapter)
+
+    return render(request, 'main/edit_chapter.html', {
+        'form': form,
+        'chapter': chapter,
+        'course': course,
+    })
+
+
+@login_required
+def delete_chapter(request, chapter_id):
+    chapter = get_object_or_404(CourseChapter, id=chapter_id)
+    course, redirect_resp = _require_course_teacher(request, chapter.course_id)
+    if redirect_resp:
+        return redirect_resp
+
+    if request.method == 'POST':
+        chapter.delete()
+
+    return redirect('manage_content', course_id=course.id)
+
+
+@login_required
+def add_lesson(request, chapter_id):
+    chapter = get_object_or_404(CourseChapter, id=chapter_id)
+    course, redirect_resp = _require_course_teacher(request, chapter.course_id)
+    if redirect_resp:
+        return redirect_resp
+
+    if request.method == 'POST':
+        form = LessonForm(request.POST)
+        if form.is_valid():
+            lesson = form.save(commit=False)
+            lesson.chapter = chapter
+            lesson.save()
+
+    return redirect('manage_content', course_id=course.id)
+
+
+@login_required
+def edit_lesson(request, lesson_id):
+    lesson = get_object_or_404(CourseLesson, id=lesson_id)
+    course, redirect_resp = _require_course_teacher(request, lesson.chapter.course_id)
+    if redirect_resp:
+        return redirect_resp
+
+    if request.method == 'POST':
+        form = LessonForm(request.POST, instance=lesson)
+        if form.is_valid():
+            form.save()
+            return redirect('manage_content', course_id=course.id)
+    else:
+        form = LessonForm(instance=lesson)
+
+    return render(request, 'main/edit_lesson.html', {
+        'form': form,
+        'lesson': lesson,
+        'course': course,
+    })
+
+
+@login_required
+def delete_lesson(request, lesson_id):
+    lesson = get_object_or_404(CourseLesson, id=lesson_id)
+    course, redirect_resp = _require_course_teacher(request, lesson.chapter.course_id)
+    if redirect_resp:
+        return redirect_resp
+
+    if request.method == 'POST':
+        lesson.delete()
+
+    return redirect('manage_content', course_id=course.id)
+
+
+# =========================
+# A3 退款審核（老師 / 管理員）
+# =========================
+
+@login_required
+def manage_refunds(request):
+    if request.user.is_superuser:
+        refunds = Refund.objects.select_related(
+            'order', 'order__course', 'user'
+        ).order_by('-created_at')
+    else:
+        try:
+            profile = request.user.profile
+        except Profile.DoesNotExist:
+            return redirect('home')
+        if profile.role != 'teacher':
+            return redirect('home')
+        refunds = Refund.objects.filter(
+            order__course__teacher=request.user
+        ).select_related('order', 'order__course', 'user').order_by('-created_at')
+
+    return render(request, 'main/manage_refunds.html', {
+        'refunds': refunds,
+    })
+
+
+@login_required
+def process_refund(request, refund_id):
+    refund = get_object_or_404(Refund, id=refund_id)
+
+    # 權限：管理員或該課程講師
+    is_teacher = (
+        not request.user.is_superuser
+        and refund.order.course
+        and refund.order.course.teacher_id == request.user.id
+    )
+    if not (request.user.is_superuser or is_teacher):
+        return redirect('home')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'approve' and refund.status == 'pending':
+            refund.status = 'approved'
+            refund.processed_at = timezone.now()
+            refund.save()
+            order = refund.order
+            order.status = 'refunded'
+            order.save()
+            Notification.objects.create(
+                user=refund.user,
+                title='退款已通過',
+                content=f'訂單 #{order.id} 的退款申請已通過，將退還 NT$ {refund.amount}。'
+            )
+        elif action == 'reject' and refund.status == 'pending':
+            refund.status = 'rejected'
+            refund.processed_at = timezone.now()
+            refund.save()
+            Notification.objects.create(
+                user=refund.user,
+                title='退款未通過',
+                content=f'訂單 #{refund.order.id} 的退款申請未通過。'
+            )
+
+    return redirect('manage_refunds')
+
+
+# =========================
+# A6 通知中心
+# =========================
+
+@login_required
+def notifications(request):
+    notes = Notification.objects.filter(
+        user=request.user
+    ).order_by('-created_at')
+
+    return render(request, 'main/notifications.html', {
+        'notifications': notes,
+    })
+
+
+@login_required
+def mark_notifications_read(request):
+    if request.method == 'POST':
+        Notification.objects.filter(
+            user=request.user, is_read=False
+        ).update(is_read=True)
+    return redirect('notifications')
+
+
+# =========================
+# A7 課程問答
+# =========================
+
+@login_required
+def add_question(request, course_id):
+    course = get_object_or_404(Course, id=course_id)
+
+    purchased = Enrollment.objects.filter(
+        student=request.user, course=course
+    ).exists()
+    is_teacher = course.teacher_id == request.user.id
+
+    if request.method == 'POST' and (purchased or is_teacher):
+        form = QuestionForm(request.POST)
+        if form.is_valid():
+            q = form.save(commit=False)
+            q.user = request.user
+            q.course = course
+            q.save()
+            if not is_teacher:
+                Notification.objects.create(
+                    user=course.teacher,
+                    title='課程有新提問',
+                    content=f'課程「{course.title}」收到新的問題：{q.title}'
+                )
+
+    return redirect('course_detail', course_id=course.id)
+
+
+@login_required
+def add_answer(request, question_id):
+    question = get_object_or_404(CourseQuestion, id=question_id)
+    course = question.course
+
+    is_teacher = course.teacher_id == request.user.id
+    if not (is_teacher or request.user.is_superuser):
+        return redirect('course_detail', course_id=course.id)
+
+    if request.method == 'POST':
+        form = AnswerForm(request.POST)
+        if form.is_valid():
+            a = form.save(commit=False)
+            a.question = question
+            a.user = request.user
+            a.save()
+            Notification.objects.create(
+                user=question.user,
+                title='你的提問已被回覆',
+                content=f'課程「{course.title}」中你的問題「{question.title}」已有回答。'
+            )
+
+    return redirect('course_detail', course_id=course.id)
+
+
+# =========================
+# A8 課程審核（管理員）
+# =========================
+
+@login_required
+def manage_audits(request):
+    if not request.user.is_superuser:
+        return redirect('home')
+
+    audits = CourseAudit.objects.select_related(
+        'course', 'course__teacher', 'reviewer'
+    ).order_by('-created_at')
+
+    return render(request, 'main/manage_audits.html', {
+        'audits': audits,
+    })
+
+
+@login_required
+def process_audit(request, audit_id):
+    if not request.user.is_superuser:
+        return redirect('home')
+
+    audit = get_object_or_404(CourseAudit, id=audit_id)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        comment = request.POST.get('comment', '').strip()
+
+        if action == 'approve':
+            audit.status = 'approved'
+            audit.reviewer = request.user
+            audit.comment = comment
+            audit.reviewed_at = timezone.now()
+            audit.save()
+            course = audit.course
+            course.is_published = True
+            course.save()
+            Notification.objects.create(
+                user=course.teacher,
+                title='課程審核通過',
+                content=f'你的課程「{course.title}」已通過審核並上架。'
+            )
+        elif action == 'reject':
+            audit.status = 'rejected'
+            audit.reviewer = request.user
+            audit.comment = comment
+            audit.reviewed_at = timezone.now()
+            audit.save()
+            course = audit.course
+            course.is_published = False
+            course.save()
+            Notification.objects.create(
+                user=course.teacher,
+                title='課程審核未通過',
+                content=f'你的課程「{course.title}」未通過審核。原因：{comment or "未提供"}'
+            )
+
+    return redirect('manage_audits')

@@ -43,6 +43,8 @@
           <div class="total">合計：NT$ {{ total }}</div>
           <form method="post" action="{% url 'cart_checkout' %}">
             {% csrf_token %}
+            <input type="text" name="coupon_code" placeholder="輸入優惠碼（可留空，符合條件的促銷會自動套用）"
+                   style="width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; box-sizing:border-box; margin-bottom:12px;" />
             <button type="submit" class="btn">結帳並開通課程</button>
           </form>
         {% else %}

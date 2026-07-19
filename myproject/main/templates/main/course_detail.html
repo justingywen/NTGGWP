@@ -233,6 +233,7 @@
 
         {% if user.is_authenticated %} {% if already_purchased %}
         <p class="purchased-text">你已經購買過這門課程</p>
+        <a href="{% url 'watch_course' course.id %}" class="buy-btn" style="background:#16a34a;">▶ 開始上課</a>
         {% else %}
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <a href="{% url 'checkout' course.id %}" class="buy-btn">前往結帳</a>
@@ -337,6 +338,54 @@
         {% endfor %} {% else %}
         <p class="empty-text">目前尚無學生評價。</p>
         {% endif %}
+      </div>
+
+      <div class="card">
+        <h2>課程問答</h2>
+
+        {% if user.is_authenticated and already_purchased or is_course_teacher %}
+        <div class="form-box">
+          <h3>我要提問</h3>
+          <form method="post" action="{% url 'add_question' course.id %}">
+            {% csrf_token %}
+            <div style="margin-bottom:12px;">
+              <label><strong>問題標題</strong></label><br />
+              {{ question_form.title }}
+            </div>
+            <div style="margin-bottom:12px;">
+              <label><strong>問題內容</strong></label><br />
+              {{ question_form.content }}
+            </div>
+            <button type="submit" class="buy-btn">送出問題</button>
+          </form>
+        </div>
+        {% else %}
+        <p class="empty-text">購買課程後即可在此提問。</p>
+        {% endif %}
+
+        {% for q in questions %}
+        <div class="review">
+          <div class="review-user">Q：{{ q.title }}</div>
+          <div class="lesson-meta">{{ q.user.username }} ・ {{ q.created_at|date:"Y-m-d" }}</div>
+          {% if q.content %}<p>{{ q.content }}</p>{% endif %}
+
+          {% for ans in q.answers.all %}
+          <div style="background:#f0fdf4; border-left:4px solid #16a34a; padding:10px 14px; border-radius:8px; margin:8px 0;">
+            <strong style="color:#166534;">A（{{ ans.user.username }}）：</strong>{{ ans.content }}
+          </div>
+          {% endfor %}
+
+          {% if is_course_teacher or user.is_superuser %}
+          <form method="post" action="{% url 'add_answer' q.id %}" style="margin-top:8px;">
+            {% csrf_token %}
+            {{ answer_form.content }}
+            <button type="submit" class="buy-btn" style="margin-top:8px; padding:8px 16px;">回覆</button>
+          </form>
+          {% endif %}
+        </div>
+        {% empty %}
+        <p class="empty-text">目前還沒有任何提問。</p>
+        {% endfor %}
       </div>
     </div>
   </body>

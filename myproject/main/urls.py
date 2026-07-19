@@ -62,6 +62,31 @@ urlpatterns = [
     path('coupons/claim/<int:coupon_id>/', views.claim_coupon, name='claim_coupon'),
     path('my-coupons/', views.my_coupons, name='my_coupons'),
 
+    # A2 章節/單元管理
+    path('course/<int:course_id>/content/', views.manage_content, name='manage_content'),
+    path('content/chapter/add/<int:course_id>/', views.add_chapter, name='add_chapter'),
+    path('content/chapter/<int:chapter_id>/edit/', views.edit_chapter, name='edit_chapter'),
+    path('content/chapter/<int:chapter_id>/delete/', views.delete_chapter, name='delete_chapter'),
+    path('content/lesson/add/<int:chapter_id>/', views.add_lesson, name='add_lesson'),
+    path('content/lesson/<int:lesson_id>/edit/', views.edit_lesson, name='edit_lesson'),
+    path('content/lesson/<int:lesson_id>/delete/', views.delete_lesson, name='delete_lesson'),
+
+    # A3 退款審核
+    path('refunds/manage/', views.manage_refunds, name='manage_refunds'),
+    path('refunds/<int:refund_id>/process/', views.process_refund, name='process_refund'),
+
+    # A6 通知中心
+    path('notifications/', views.notifications, name='notifications'),
+    path('notifications/read/', views.mark_notifications_read, name='mark_notifications_read'),
+
+    # A7 課程問答
+    path('course/<int:course_id>/question/add/', views.add_question, name='add_question'),
+    path('question/<int:question_id>/answer/', views.add_answer, name='add_answer'),
+
+    # A8 課程審核
+    path('audits/manage/', views.manage_audits, name='manage_audits'),
+    path('audits/<int:audit_id>/process/', views.process_audit, name='process_audit'),
+
     path('password-reset/', auth_views.PasswordResetView.as_view(
         template_name='main/password_reset.html'
     ), name='password_reset'),

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>編輯單元</title>
+    <style>
+      body { font-family: "Microsoft JhengHei", sans-serif; background: #f5f7fb; margin: 0; }
+      .container { max-width: 560px; margin: 0 auto; padding: 40px 20px; }
+      .card { background: #fff; border-radius: 16px; padding: 28px; box-shadow: 0 8px 20px rgba(0,0,0,.06); }
+      h1 { color: #111827; margin-top: 0; }
+      p, label { display: block; margin-top: 12px; font-weight: bold; color: #374151; }
+      input, textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; margin-top: 4px; }
+      .btn { margin-top: 16px; background: #2563eb; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+      .back { margin-left: 10px; color: #374151; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    {% include 'main/partials/navbar.html' %}
+    <div class="container">
+      <div class="card">
+        <h1>編輯單元</h1>
+        <form method="post">
+          {% csrf_token %}
+          {{ form.as_p }}
+          <button type="submit" class="btn">儲存</button>
+          <a href="{% url 'manage_content' course.id %}" class="back">取消</a>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>

@@ -142,7 +142,14 @@
         <div class="course-list">
           {% for item in course_data %}
           <div class="course-item">
-            <div class="course-title">{{ item.course.title }}</div>
+            <div class="course-title">
+              {{ item.course.title }}
+              {% if item.course.is_published %}
+              <span style="font-size:13px; background:#dcfce7; color:#166534; padding:3px 10px; border-radius:999px;">已上架</span>
+              {% else %}
+              <span style="font-size:13px; background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:999px;">審核中／未上架</span>
+              {% endif %}
+            </div>
 
             <div class="meta">
               <strong>價格：</strong>NT$ {{ item.course.price }}
@@ -159,6 +166,13 @@
             <div class="meta">
               <strong>課程介紹：</strong>{{ item.course.description }}
             </div>
+
+            <a
+              href="{% url 'manage_content' item.course.id %}"
+              class="btn btn-small"
+            >
+              內容管理（章節/單元）
+            </a>
 
             <a
               href="{% url 'edit_course' item.course.id %}"
