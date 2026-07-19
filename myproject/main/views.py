@@ -394,6 +394,8 @@ def checkout(request, course_id):
     success_message = None
 
     if request.method == 'POST':
+        # action：apply=只套用預覽折扣、buy=確認購買
+        action = request.POST.get('action', 'buy')
         coupon_code = request.POST.get('coupon_code', '').strip()
 
         if coupon_code:
@@ -420,8 +422,12 @@ def checkout(request, course_id):
                     else:
                         final_price = original_price - discount_amount
                         success_message = f'優惠券已套用，折抵 NT$ {discount_amount}。'
+        elif action == 'buy':
+            success_message = None  # 沒輸入券，直接原價購買
 
-        if not error_message:
+        # 只有按「確認購買」且沒有錯誤時才真正成立訂單；
+        # 按「套用優惠券」只重新整理頁面顯示折扣預覽。
+        if action == 'buy' and not error_message:
             order = Order.objects.create(
                 user=request.user,
                 course=course,
