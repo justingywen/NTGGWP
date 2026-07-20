@@ -4,31 +4,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>通知中心</title>
+    {% include 'main/partials/glass_head.html' %}
     <style>
-      body { font-family: "Microsoft JhengHei", sans-serif; background: #f5f7fb; margin: 0; color: #222; }
-      .container { max-width: 760px; margin: 0 auto; padding: 40px 20px; }
-      .card { background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,.06); }
-      .head { display: flex; justify-content: space-between; align-items: center; }
-      h1 { color: #111827; margin: 0; }
-      .btn { background: #2563eb; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
-      .note { border-left: 4px solid #d1d5db; padding: 14px 16px; margin-top: 14px; border-radius: 8px; background: #f9fafb; }
-      .note.unread { border-left-color: #2563eb; background: #eff6ff; }
-      .n-title { font-weight: bold; color: #111827; }
-      .n-content { color: #4b5563; margin-top: 4px; }
-      .n-time { color: #9ca3af; font-size: 13px; margin-top: 6px; }
-      .dot { display: inline-block; width: 8px; height: 8px; background: #2563eb; border-radius: 50%; margin-right: 6px; }
-      .empty { color: #6b7280; }
+      .container { max-width: 760px; margin: 40px auto; padding: 0 20px; }
+      .card { padding: 28px; }
+      .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      h1 { margin: 0; font-size: 26px; font-weight: 800; }
+      .note { border-left: 4px solid rgba(148,163,184,0.5); padding: 14px 16px; margin-top: 14px; border-radius: 10px; background: rgba(255,255,255,0.4); }
+      .note.unread { border-left-color: var(--brand); background: rgba(79,70,229,0.08); }
+      .n-title { font-weight: 800; }
+      .n-content { color: #334155; margin-top: 4px; }
+      .n-time { color: #94a3b8; font-size: 13px; margin-top: 6px; }
+      .dot { display: inline-block; width: 8px; height: 8px; background: var(--brand); border-radius: 50%; margin-right: 6px; }
+      .empty { color: var(--ink-soft); margin-top: 16px; }
     </style>
   </head>
   <body>
     {% include 'main/partials/navbar.html' %}
     <div class="container">
-      <div class="card">
+      <div class="glass card">
         <div class="head">
           <h1>通知中心</h1>
           <form method="post" action="{% url 'mark_notifications_read' %}">
             {% csrf_token %}
-            <button type="submit" class="btn">全部標為已讀</button>
+            <button type="submit" class="glass-btn">全部標為已讀</button>
           </form>
         </div>
         {% if notifications %}
@@ -40,7 +39,7 @@
           </div>
           {% endfor %}
         {% else %}
-          <p class="empty" style="margin-top:16px;">目前沒有任何通知。</p>
+        <p class="empty">目前沒有任何通知。</p>
         {% endif %}
       </div>
     </div>

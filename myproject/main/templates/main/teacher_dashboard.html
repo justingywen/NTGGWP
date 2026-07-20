@@ -4,201 +4,68 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>老師首頁</title>
+    {% include 'main/partials/glass_head.html' %}
     <style>
-      body {
-        font-family: "Microsoft JhengHei", sans-serif;
-        background: #f7f8fb;
-        margin: 0;
-        color: #1f2937;
-      }
-
-      .container {
-        max-width: 1100px;
-        margin: 50px auto;
-        padding: 20px;
-      }
-
-      .card {
-        background: white;
-        border-radius: 20px;
-        padding: 32px;
-        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
-      }
-
-      h1 {
-        margin-top: 0;
-        font-size: 34px;
-      }
-
-      p {
-        color: #6b7280;
-        line-height: 1.8;
-      }
-
-      .box-group {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 20px;
-        margin-top: 28px;
-      }
-
-      .box {
-        background: #eff6ff;
-        border-radius: 16px;
-        padding: 22px;
-      }
-
-      .box h3 {
-        margin-top: 0;
-        margin-bottom: 10px;
-      }
-
-      .course-list {
-        margin-top: 32px;
-        display: grid;
-        gap: 18px;
-      }
-
-      .course-item {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        padding: 20px;
-      }
-
-      .course-title {
-        font-size: 22px;
-        font-weight: bold;
-        margin-bottom: 10px;
-      }
-
-      .meta {
-        color: #4b5563;
-        line-height: 1.8;
-      }
-
-      .btn {
-        display: inline-block;
-        margin-top: 22px;
-        background: #2563eb;
-        color: white;
-        padding: 12px 22px;
-        border-radius: 12px;
-        text-decoration: none;
-      }
-
-      .btn-small {
-        margin-top: 14px;
-        margin-right: 8px;
-        padding: 10px 16px;
-        font-size: 14px;
-      }
-
-      .btn-danger {
-        background: #dc2626;
-      }
-
-      .empty-box {
-        margin-top: 24px;
-        background: #f9fafb;
-        border: 2px dashed #cbd5e1;
-        border-radius: 18px;
-        padding: 30px;
-        text-align: center;
-        color: #64748b;
-        line-height: 1.8;
-      }
+      .container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+      .card { padding: 32px; margin-bottom: 22px; }
+      h1 { margin: 0 0 8px; font-size: 28px; font-weight: 800; }
+      .desc { color: var(--ink-soft); line-height: 1.8; margin: 0 0 18px; }
+      .course-list { display: grid; gap: 18px; }
+      .course-item { padding: 22px; }
+      .ci-title { font-size: 20px; font-weight: 800; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .badge { font-size: 13px; padding: 3px 12px; border-radius: 999px; font-weight: 700; }
+      .b-on { background: rgba(22,163,74,0.15); color: #166534; }
+      .b-off { background: rgba(245,158,11,0.18); color: #92400e; }
+      .metrics { display: flex; gap: 22px; flex-wrap: wrap; color: var(--ink-soft); margin-bottom: 14px; }
+      .metrics b { color: var(--ink); }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .actions .glass-btn { font-size: 14px; padding: 9px 15px; }
+      .empty-box { padding: 34px; text-align: center; color: var(--ink-soft); line-height: 1.9; }
     </style>
   </head>
   <body>
     {% include 'main/partials/navbar.html' %}
-
     <div class="container">
-      <div class="card">
+      <div class="glass card">
         <h1>老師首頁</h1>
-        <p>
-          歡迎，{{ request.user.username
-          }}。這裡會顯示你所管理的課程、購買狀況與學習數據。
-        </p>
-
-        <a href="{% url 'create_course' %}" class="btn">＋ 新增課程</a>
-
-        <div class="box-group">
-          <div class="box">
-            <h3>我的課程</h3>
-            <p>顯示你所建立或管理的課程內容。</p>
-          </div>
-          <div class="box">
-            <h3>銷售與購買</h3>
-            <p>可查看每門課程被購買的次數，作為後續營收分析基礎。</p>
-          </div>
-          <div class="box">
-  <h3>課程分析圖表</h3>
-  <p>查看課程銷售數、營收、觀看分鐘與平均評分。</p>
-  <a href="{% url 'teacher_analytics' %}" class="btn">查看分析圖表</a>
-</div>
-
-        {% if course_data %}
-        <div class="course-list">
-          {% for item in course_data %}
-          <div class="course-item">
-            <div class="course-title">
-              {{ item.course.title }}
-              {% if item.course.is_published %}
-              <span style="font-size:13px; background:#dcfce7; color:#166534; padding:3px 10px; border-radius:999px;">已上架</span>
-              {% else %}
-              <span style="font-size:13px; background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:999px;">審核中／未上架</span>
-              {% endif %}
-            </div>
-
-            <div class="meta">
-              <strong>價格：</strong>NT$ {{ item.course.price }}
-            </div>
-
-            <div class="meta">
-              <strong>購買人數：</strong>{{ item.purchase_count }} 人
-            </div>
-
-            <div class="meta">
-              <strong>總觀看時間：</strong>{{ item.total_watch_minutes }} 分鐘
-            </div>
-
-            <div class="meta">
-              <strong>課程介紹：</strong>{{ item.course.description }}
-            </div>
-
-            <a
-              href="{% url 'manage_content' item.course.id %}"
-              class="btn btn-small"
-            >
-              內容管理（章節/單元）
-            </a>
-
-            <a
-              href="{% url 'edit_course' item.course.id %}"
-              class="btn btn-small"
-            >
-              編輯課程
-            </a>
-
-            <a
-              href="{% url 'delete_course' item.course.id %}"
-              class="btn btn-small btn-danger"
-            >
-              刪除課程
-            </a>
-          </div>
-          {% endfor %}
+        <p class="desc">歡迎，{{ request.user.username }}。管理你的課程、內容與銷售數據。</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <a href="{% url 'create_course' %}" class="glass-btn">＋ 新增課程</a>
+          <a href="{% url 'teacher_analytics' %}" class="glass-btn ghost">課程分析圖表</a>
         </div>
-        {% else %}
-        <div class="empty-box">
-          你目前還沒有建立任何課程。<br />
-          可以點上方「＋ 新增課程」建立你的第一門課。
-        </div>
-        {% endif %}
-
-        <a href="/" class="btn">回首頁</a>
       </div>
+
+      {% if course_data %}
+      <div class="course-list">
+        {% for item in course_data %}
+        <div class="glass course-item">
+          <div class="ci-title">
+            {{ item.course.title }}
+            {% if item.course.is_published %}
+            <span class="badge b-on">已上架</span>
+            {% else %}
+            <span class="badge b-off">審核中／未上架</span>
+            {% endif %}
+          </div>
+          <div class="metrics">
+            <div>價格 <b>NT$ {{ item.course.price }}</b></div>
+            <div>購買 <b>{{ item.purchase_count }}</b> 人</div>
+            <div>觀看 <b>{{ item.total_watch_minutes }}</b> 分</div>
+            {% if item.average_rating %}<div>評分 <b>★ {{ item.average_rating }}</b></div>{% endif %}
+          </div>
+          <div class="actions">
+            <a href="{% url 'manage_content' item.course.id %}" class="glass-btn">內容管理</a>
+            <a href="{% url 'edit_course' item.course.id %}" class="glass-btn ghost">編輯課程</a>
+            <a href="{% url 'delete_course' item.course.id %}" class="glass-btn danger">刪除</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="glass empty-box">
+        你目前還沒有建立任何課程。<br />點上方「＋ 新增課程」建立你的第一門課。
+      </div>
+      {% endif %}
     </div>
   </body>
 </html>

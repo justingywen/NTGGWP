@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ lesson.title }} ｜ {{ course.title }}</title>
+    {% include 'main/partials/glass_head.html' %}
+    <style>
+      .wrap { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
+      .layout { display: grid; grid-template-columns: 1fr 340px; gap: 22px; align-items: start; }
+
+      .player-card { padding: 0; overflow: hidden; }
+      .video-box { background: #000; aspect-ratio: 16 / 9; display: grid; place-items: center; }
+      .video-box video { width: 100%; height: 100%; }
+      .no-video { color: #cbd5e1; text-align: center; padding: 40px; line-height: 1.8; }
+      .player-body { padding: 24px; }
+      .crumb { color: var(--ink-soft); font-size: 14px; margin-bottom: 6px; }
+      h1 { margin: 0 0 10px; font-size: 24px; font-weight: 800; }
+      .lesson-meta { color: var(--ink-soft); margin-bottom: 16px; }
+      .lesson-content { line-height: 1.9; color: #334155; }
+      .done-row { margin-top: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+      .done-tag { color: #16a34a; font-weight: 800; }
+
+      /* 側欄 */
+      .side { padding: 20px; position: sticky; top: 88px; max-height: calc(100vh - 110px); overflow-y: auto; }
+      .side h2 { margin: 0 0 6px; font-size: 18px; font-weight: 800; }
+      .prog-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-soft); margin: 10px 0 5px; }
+      .bar { height: 9px; border-radius: 999px; background: rgba(148,163,184,0.3); overflow: hidden; margin-bottom: 16px; }
+      .bar > i { display: block; height: 100%; background: linear-gradient(90deg,#4f46e5,#7c3aed); }
+      .ch-title { font-weight: 800; font-size: 14px; margin: 14px 0 6px; color: var(--ink-soft); }
+      .l-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; text-decoration: none; color: var(--ink); margin-bottom: 4px; font-size: 14px; }
+      .l-item:hover { background: rgba(255,255,255,0.5); }
+      .l-item.active { background: linear-gradient(135deg, rgba(79,70,229,0.15), rgba(124,58,237,0.15)); font-weight: 700; }
+      .l-item.locked { color: #94a3b8; cursor: not-allowed; }
+      .l-mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; flex-shrink: 0; border: 1px solid rgba(148,163,184,0.5); }
+      .l-mark.ok { background: #16a34a; color: #fff; border-color: #16a34a; }
+      .l-dur { margin-left: auto; color: #94a3b8; font-size: 12px; }
+
+      @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .side { position: static; max-height: none; } }
+    </style>
+  </head>
+  <body>
+    {% include 'main/partials/navbar.html' %}
+
+    <div class="wrap">
+      <div class="layout">
+        <!-- 播放器 -->
+        <div>
+          <div class="glass player-card">
+            <div class="video-box">
+              {% if lesson.video_file %}
+              <video controls preload="metadata" controlslist="nodownload">
+                <source src="{{ lesson.video_file.url }}" />
+                你的瀏覽器不支援影片播放。
+              </video>
+              {% elif lesson.video_url %}
+              <video controls preload="metadata">
+                <source src="{{ lesson.video_url }}" />
+              </video>
+              {% else %}
+              <div class="no-video">🎬 此單元尚未上傳影片<br />老師可於「內容管理」上傳 mp4 影片檔</div>
+              {% endif %}
+            </div>
+            <div class="player-body">
+              <div class="crumb">{{ course.title }} ・ 第 {{ lesson.chapter.sort_order }} 章</div>
+              <h1>{{ lesson.chapter.sort_order }}-{{ lesson.sort_order }} {{ lesson.title }}</h1>
+              <div class="lesson-meta">影片長度 {{ lesson.duration_minutes }} 分鐘{% if lesson.is_free_preview %} ・ 免費試看{% endif %}</div>
+              {% if lesson.content %}<div class="lesson-content">{{ lesson.content|linebreaksbr }}</div>{% endif %}
+
+              {% if can_record %}
+              <div class="done-row">
+                {% if is_completed %}
+                <span class="done-tag">✓ 已完成本單元</span>
+                {% else %}
+                <form method="post">
+                  {% csrf_token %}
+                  <button type="submit" class="glass-btn" style="background:linear-gradient(135deg,#16a34a,#15803d);">標記本單元完成</button>
+                </form>
+                {% endif %}
+                <a href="{% url 'course_detail' course.id %}" class="glass-btn ghost">課程頁</a>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- 側欄課綱 -->
+        <aside>
+          <div class="glass side">
+            <h2>課程內容</h2>
+            <div class="prog-label"><span>完成進度</span><span>{{ done_count }}/{{ total_lessons }}（{{ progress }}%）</span></div>
+            <div class="bar"><i style="width: {{ progress }}%;"></i></div>
+
+            {% for chapter in chapters %}
+            <div class="ch-title">第 {{ chapter.sort_order }} 章：{{ chapter.title }}</div>
+            {% for l in chapter.lessons.all %}
+              {% if can_record or l.is_free_preview %}
+              <a href="{% url 'watch_lesson' l.id %}" class="l-item {% if l.id == lesson.id %}active{% endif %}">
+                <span class="l-mark {% if l.id in completed_ids %}ok{% endif %}">{% if l.id in completed_ids %}✓{% endif %}</span>
+                <span>{{ chapter.sort_order }}-{{ l.sort_order }} {{ l.title }}</span>
+                <span class="l-dur">{{ l.duration_minutes }}分</span>
+              </a>
+              {% else %}
+              <div class="l-item locked">
+                <span class="l-mark">🔒</span>
+                <span>{{ chapter.sort_order }}-{{ l.sort_order }} {{ l.title }}</span>
+                <span class="l-dur">{{ l.duration_minutes }}分</span>
+              </div>
+              {% endif %}
+            {% endfor %}
+            {% endfor %}
+          </div>
+        </aside>
+      </div>
+    </div>
+  </body>
+</html>

@@ -4,18 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>領取優惠券</title>
+    {% include 'main/partials/glass_head.html' %}
     <style>
-      body { font-family: "Microsoft JhengHei", sans-serif; background: #f5f7fb; margin: 0; color: #222; }
-      .container { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
-      h1 { color: #111827; }
+      .container { max-width: 1040px; margin: 40px auto; padding: 0 20px; }
+      h1 { font-size: 28px; font-weight: 800; margin-bottom: 20px; }
       .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-      .coupon { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 8px 20px rgba(0,0,0,.06); border-left: 6px solid #2563eb; display: flex; flex-direction: column; gap: 8px; }
-      .c-name { font-weight: bold; font-size: 18px; color: #111827; }
-      .c-code { display: inline-block; background: #eef2ff; color: #3730a3; padding: 4px 10px; border-radius: 6px; font-weight: bold; letter-spacing: 1px; }
-      .c-desc { color: #6b7280; font-size: 14px; }
-      .btn { margin-top: 8px; text-align: center; background: #2563eb; color: #fff; padding: 10px; border-radius: 10px; text-decoration: none; font-weight: bold; border: none; cursor: pointer; }
-      .btn-done { background: #9ca3af; cursor: default; }
-      .empty { color: #6b7280; }
+      .coupon { padding: 22px; border-left: 6px solid var(--brand); display: flex; flex-direction: column; gap: 8px; }
+      .c-name { font-weight: 800; font-size: 18px; }
+      .c-code { display: inline-block; align-self: flex-start; background: rgba(79,70,229,0.14); color: #4338ca; padding: 4px 12px; border-radius: 6px; font-weight: 800; letter-spacing: 1px; }
+      .c-desc { color: var(--ink-soft); font-size: 14px; line-height: 1.6; }
+      .btn-done { text-align: center; padding: 10px; border-radius: 12px; background: rgba(148,163,184,0.3); color: var(--ink-soft); font-weight: 700; }
+      .empty { padding: 40px; text-align: center; color: var(--ink-soft); }
     </style>
   </head>
   <body>
@@ -25,27 +24,26 @@
       {% if coupons %}
       <div class="grid">
         {% for c in coupons %}
-        <div class="coupon">
+        <div class="glass coupon">
           <div class="c-name">{{ c.name }}</div>
           <span class="c-code">{{ c.code }}</span>
           <div class="c-desc">
             {% if c.discount_type == 'amount' %}折抵 NT$ {{ c.discount_value }}{% else %}打 {{ c.discount_value }}% 折扣{% endif %}
-            ・ 最低消費 NT$ {{ c.min_spend }}<br />
-            使用期限：{{ c.end_date|date:"Y-m-d" }}
+            ・ 最低消費 NT$ {{ c.min_spend }}<br />使用期限：{{ c.end_date|date:"Y-m-d" }}
           </div>
           {% if c.id in claimed_ids %}
-          <span class="btn btn-done">已領取</span>
+          <span class="btn-done">已領取</span>
           {% else %}
           <form method="post" action="{% url 'claim_coupon' c.id %}">
             {% csrf_token %}
-            <button type="submit" class="btn" style="width:100%;">立即領取</button>
+            <button type="submit" class="glass-btn" style="width:100%;">立即領取</button>
           </form>
           {% endif %}
         </div>
         {% endfor %}
       </div>
       {% else %}
-      <p class="empty">目前沒有可領取的優惠券。</p>
+      <div class="glass empty">目前沒有可領取的優惠券。</div>
       {% endif %}
     </div>
   </body>

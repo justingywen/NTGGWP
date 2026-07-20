@@ -105,6 +105,12 @@ class CourseLesson(models.Model):
     title = models.CharField(max_length=200, verbose_name="單元名稱")
     content = models.TextField(blank=True, null=True, verbose_name="單元內容")
     video_url = models.URLField(blank=True, null=True, verbose_name="影片連結")
+    video_file = models.FileField(
+        upload_to='course_videos/',
+        blank=True,
+        null=True,
+        verbose_name="上傳影片檔"
+    )
     duration_minutes = models.PositiveIntegerField(default=0, verbose_name="影片分鐘數")
     sort_order = models.PositiveIntegerField(default=1, verbose_name="單元順序")
     is_free_preview = models.BooleanField(default=False, verbose_name="是否免費試看")

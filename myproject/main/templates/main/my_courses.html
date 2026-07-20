@@ -4,192 +4,79 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>我的課程</title>
+    {% include 'main/partials/glass_head.html' %}
     <style>
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        font-family: "Microsoft JhengHei", sans-serif;
-        background: #f7f8fb;
-        margin: 0;
-        color: #1f2937;
-      }
-
-      .container {
-        max-width: 1100px;
-        margin: 50px auto;
-        padding: 20px;
-      }
-
-      .card {
-        background: white;
-        border-radius: 20px;
-        padding: 32px;
-        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
-      }
-
-      h1 {
-        margin-top: 0;
-        font-size: 34px;
-        margin-bottom: 10px;
-      }
-
-      .desc {
-        color: #6b7280;
-        line-height: 1.8;
-        margin-bottom: 28px;
-      }
-
-      .summary-box {
-        background: #eff6ff;
-        border-radius: 16px;
-        padding: 20px;
-        margin-bottom: 28px;
-      }
-
-      .summary-box strong {
-        color: #2563eb;
-        font-size: 22px;
-      }
-
-      .course-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 22px;
-      }
-
-      .course-item {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 18px;
-        padding: 20px;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
-      }
-
-      .course-img {
-        width: 100%;
-        height: 170px;
-        object-fit: cover;
-        border-radius: 14px;
-        margin-bottom: 14px;
-        background: #e5e7eb;
-      }
-
-      .course-title {
-        font-size: 22px;
-        font-weight: bold;
-        margin-bottom: 10px;
-        color: #111827;
-      }
-
-      .meta {
-        color: #4b5563;
-        margin-bottom: 8px;
-        line-height: 1.7;
-      }
-
-      .buy-time {
-        color: #6b7280;
-        font-size: 14px;
-        margin-top: 10px;
-      }
-
-      .btn {
-        display: inline-block;
-        margin-top: 14px;
-        background: #2563eb;
-        color: white;
-        padding: 10px 18px;
-        border-radius: 10px;
-        text-decoration: none;
-        font-weight: bold;
-      }
-
-      .btn-dark {
-        background: #1f2937;
-      }
-
-      .btn-green {
-        background: #16a34a;
-      }
-
-      .empty-box {
-        background: #f9fafb;
-        border: 2px dashed #cbd5e1;
-        border-radius: 18px;
-        padding: 30px;
-        text-align: center;
-        color: #64748b;
-        line-height: 1.8;
-      }
+      .container { max-width: 1120px; margin: 36px auto; padding: 0 20px; }
+      .head-card { padding: 30px; margin-bottom: 24px; }
+      h1 { margin: 0 0 8px; font-size: 30px; font-weight: 800; }
+      .desc { color: var(--ink-soft); line-height: 1.8; margin: 0 0 18px; }
+      .summary { display: flex; gap: 16px; flex-wrap: wrap; }
+      .stat { flex: 1; min-width: 160px; padding: 18px; border-radius: 16px; text-align: center; }
+      .stat b { display: block; font-size: 26px; color: #4338ca; }
+      .stat span { color: var(--ink-soft); font-size: 14px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; }
+      .course-item { overflow: hidden; display: flex; flex-direction: column; }
+      .course-img { width: 100%; height: 160px; object-fit: cover; background: linear-gradient(135deg,#ddd6fe,#fbcfe8); }
+      .ph { width: 100%; height: 160px; display: grid; place-items: center; font-size: 40px; font-weight: 800; color: var(--brand); opacity: .5; background: linear-gradient(135deg,#ddd6fe,#fbcfe8); }
+      .ci-body { padding: 18px; display: flex; flex-direction: column; flex: 1; }
+      .ci-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+      .ci-teacher { color: var(--ink-soft); font-size: 14px; margin-bottom: 12px; }
+      .progress-wrap { margin: 6px 0 4px; }
+      .progress-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-soft); margin-bottom: 5px; }
+      .bar { height: 9px; border-radius: 999px; background: rgba(148,163,184,0.3); overflow: hidden; }
+      .bar > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg,#4f46e5,#7c3aed); }
+      .ci-actions { margin-top: auto; padding-top: 14px; display: flex; gap: 8px; }
+      .ci-actions .glass-btn { flex: 1; text-align: center; padding: 10px; font-size: 14px; }
+      .empty-box { padding: 40px; text-align: center; color: var(--ink-soft); }
     </style>
   </head>
   <body>
     {% include 'main/partials/navbar.html' %}
 
     <div class="container">
-      <div class="card">
+      <div class="glass head-card">
         <h1>我的課程</h1>
-        <p class="desc">
-          歡迎，{{ request.user.username
-          }}。這裡會顯示你已購買的所有課程與學習紀錄。
-        </p>
-
-        <div class="summary-box">
-          累積學習時間：<strong>{{ total_minutes }}</strong> 分鐘
+        <p class="desc">歡迎，{{ request.user.username }}。這裡顯示你已購買的課程與學習進度。</p>
+        <div class="summary">
+          <div class="glass-strong stat"><b>{{ enrollments|length }}</b><span>已購課程</span></div>
+          <div class="glass-strong stat"><b>{{ total_minutes }}</b><span>累積學習分鐘</span></div>
         </div>
-
-        {% if enrollments %}
-        <div class="course-grid">
-          {% for enrollment in enrollments %}
-          <div class="course-item">
-            {% if enrollment.course.image %}
-            <img
-              src="{{ enrollment.course.image.url }}"
-              alt="{{ enrollment.course.title }}"
-              class="course-img"
-            />
-            {% endif %}
-
-            <div class="course-title">{{ enrollment.course.title }}</div>
-            <div class="meta">
-              <strong>講師：</strong>{{ enrollment.course.teacher.username }}
-            </div>
-            <div class="meta">{{ enrollment.course.description }}</div>
-            <div class="meta">
-              <strong>本課程觀看時間：</strong>{{ enrollment.watch_minutes }}
-              分鐘
-            </div>
-            <div class="buy-time">
-              <strong>購買時間：</strong>{{ enrollment.purchased_at }}
-            </div>
-
-            <a
-              href="{% url 'course_detail' enrollment.course.id %}"
-              class="btn"
-            >
-              查看課程
-            </a>
-
-            <a
-              href="{% url 'watch_course' enrollment.course.id %}"
-              class="btn btn-green"
-            >
-              模擬觀看 30 分鐘
-            </a>
-          </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <div class="empty-box">
-          你目前還沒有購買任何課程。<br />
-          可以先到首頁瀏覽課程並完成購買。
-        </div>
-        {% endif %}
-
-        <a href="/" class="btn btn-dark">回首頁</a>
       </div>
+
+      {% if enrollments %}
+      <div class="grid">
+        {% for enrollment in enrollments %}
+        <div class="glass course-item">
+          {% if enrollment.course.image %}
+          <img src="{{ enrollment.course.image.url }}" alt="{{ enrollment.course.title }}" class="course-img" />
+          {% else %}
+          <div class="ph">{{ enrollment.course.title|slice:":1" }}</div>
+          {% endif %}
+          <div class="ci-body">
+            <div class="ci-title">{{ enrollment.course.title }}</div>
+            <div class="ci-teacher">講師：{{ enrollment.course.teacher.username }}</div>
+
+            <div class="progress-wrap">
+              <div class="progress-label">
+                <span>學習進度</span>
+                <span>{{ enrollment.progress }}%（{{ enrollment.watch_minutes }}/{{ enrollment.course_total_minutes }} 分）</span>
+              </div>
+              <div class="bar"><i style="width: {{ enrollment.progress }}%;"></i></div>
+            </div>
+
+            <div class="ci-actions">
+              <a href="{% url 'course_detail' enrollment.course.id %}" class="glass-btn ghost">課程頁</a>
+              <a href="{% url 'watch_course' enrollment.course.id %}" class="glass-btn" style="background:linear-gradient(135deg,#16a34a,#15803d);">▶ 上課</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="glass empty-box">
+        你目前還沒有購買任何課程。<br />可以先到首頁瀏覽課程並完成購買。
+      </div>
+      {% endif %}
     </div>
   </body>
 </html>

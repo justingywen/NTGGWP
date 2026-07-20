@@ -5,7 +5,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Avg
+from django.db.models import Sum, Avg, Count
 
 from django.utils import timezone
 
@@ -47,13 +47,22 @@ from .forms import (
 
 
 def home(request):
-    courses = Course.objects.filter(is_published=True).select_related(
-        'teacher',
-        'category'
+    courses = list(
+        Course.objects.filter(is_published=True).select_related('teacher', 'category')
     )
 
+    # 課程卡的社會證明：評分、評價數、學生數
+    for c in courses:
+        stats = Review.objects.filter(course=c).aggregate(avg=Avg('rating'), n=Count('id'))
+        c.avg_rating = round(stats['avg'], 1) if stats['avg'] else None
+        c.review_count = stats['n']
+        c.student_count = Enrollment.objects.filter(course=c).count()
+
+    total_students = Enrollment.objects.values('student').distinct().count()
+
     return render(request, 'main/home.html', {
-        'courses': courses
+        'courses': courses,
+        'total_students': total_students,
     })
 
 
@@ -129,6 +138,13 @@ def course_detail(request, course_id):
 
     is_course_teacher = request.user.is_authenticated and course.teacher_id == request.user.id
 
+    # 課程統計（銷售頁用）
+    total_lessons = CourseLesson.objects.filter(chapter__course=course).count()
+    total_minutes = CourseLesson.objects.filter(chapter__course=course).aggregate(
+        total=Sum('duration_minutes')
+    )['total'] or 0
+    student_count = Enrollment.objects.filter(course=course).count()
+
     return render(request, 'main/course_detail.html', {
         'course': course,
         'already_purchased': already_purchased,
@@ -144,6 +160,9 @@ def course_detail(request, course_id):
         'question_form': QuestionForm(),
         'answer_form': AnswerForm(),
         'is_course_teacher': is_course_teacher,
+        'total_lessons': total_lessons,
+        'total_minutes': total_minutes,
+        'student_count': student_count,
     })
 
 
@@ -357,6 +376,17 @@ def my_courses(request):
             total=Sum('minutes')
         )['total'] or 0
 
+        course_total = CourseLesson.objects.filter(
+            chapter__course=enrollment.course
+        ).aggregate(total=Sum('duration_minutes'))['total'] or 0
+        enrollment.course_total_minutes = course_total
+
+        if course_total > 0:
+            pct = int(min(enrollment.watch_minutes, course_total) / course_total * 100)
+        else:
+            pct = 0
+        enrollment.progress = pct
+
     total_minutes = LearningRecord.objects.filter(
         user=request.user
     ).aggregate(
@@ -542,16 +572,68 @@ def watch_course(request, course_id):
         course=course
     ).exists()
 
-    if not has_purchased:
+    if not has_purchased and course.teacher_id != request.user.id:
         return redirect('course_detail', course_id=course.id)
 
-    LearningRecord.objects.create(
-        user=request.user,
-        course=course,
-        minutes=30
+    # 導向課程第一個單元的播放頁
+    first_lesson = CourseLesson.objects.filter(
+        chapter__course=course
+    ).order_by('chapter__sort_order', 'sort_order').first()
+
+    if first_lesson:
+        return redirect('watch_lesson', lesson_id=first_lesson.id)
+
+    return redirect('course_detail', course_id=course.id)
+
+
+@login_required
+def watch_lesson(request, lesson_id):
+    lesson = get_object_or_404(
+        CourseLesson.objects.select_related('chapter__course'), id=lesson_id
+    )
+    course = lesson.chapter.course
+
+    enrolled = Enrollment.objects.filter(student=request.user, course=course).exists()
+    is_teacher = course.teacher_id == request.user.id
+
+    # 免費試看單元任何登入者可看；其餘需購買或為講師
+    if not (enrolled or is_teacher or lesson.is_free_preview):
+        return redirect('course_detail', course_id=course.id)
+
+    # 標記本單元完成 → 寫入學習紀錄（每單元只記一次）
+    if request.method == 'POST' and (enrolled or is_teacher):
+        LearningRecord.objects.get_or_create(
+            user=request.user,
+            course=course,
+            lesson=lesson,
+            defaults={'minutes': lesson.duration_minutes or 30}
+        )
+        return redirect('watch_lesson', lesson_id=lesson.id)
+
+    # 側欄：所有章節/單元 + 完成狀態
+    chapters = course.chapters.prefetch_related('lessons').all()
+    completed_ids = set(
+        LearningRecord.objects.filter(user=request.user, course=course)
+        .exclude(lesson=None).values_list('lesson_id', flat=True)
     )
 
-    return redirect('my_courses')
+    total_lessons = CourseLesson.objects.filter(chapter__course=course).count()
+    done_count = len(completed_ids)
+    progress = int(done_count / total_lessons * 100) if total_lessons else 0
+
+    is_completed = lesson.id in completed_ids
+
+    return render(request, 'main/watch_lesson.html', {
+        'course': course,
+        'lesson': lesson,
+        'chapters': chapters,
+        'completed_ids': completed_ids,
+        'progress': progress,
+        'done_count': done_count,
+        'total_lessons': total_lessons,
+        'is_completed': is_completed,
+        'can_record': enrolled or is_teacher,
+    })
 
 
 @login_required
@@ -1548,7 +1630,7 @@ def add_lesson(request, chapter_id):
         return redirect_resp
 
     if request.method == 'POST':
-        form = LessonForm(request.POST)
+        form = LessonForm(request.POST, request.FILES)
         if form.is_valid():
             lesson = form.save(commit=False)
             lesson.chapter = chapter
@@ -1565,7 +1647,7 @@ def edit_lesson(request, lesson_id):
         return redirect_resp
 
     if request.method == 'POST':
-        form = LessonForm(request.POST, instance=lesson)
+        form = LessonForm(request.POST, request.FILES, instance=lesson)
         if form.is_valid():
             form.save()
             return redirect('manage_content', course_id=course.id)

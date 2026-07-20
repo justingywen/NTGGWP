@@ -96,17 +96,19 @@ class ChapterForm(forms.ModelForm):
 class LessonForm(forms.ModelForm):
     class Meta:
         model = CourseLesson
-        fields = ['title', 'content', 'video_url', 'duration_minutes', 'sort_order', 'is_free_preview']
+        fields = ['title', 'content', 'video_file', 'video_url', 'duration_minutes', 'sort_order', 'is_free_preview']
         labels = {
             'title': '單元名稱',
             'content': '單元內容',
-            'video_url': '影片連結',
+            'video_file': '上傳影片檔（mp4）',
+            'video_url': '或貼影片連結',
             'duration_minutes': '影片分鐘數',
             'sort_order': '單元順序',
             'is_free_preview': '免費試看',
         }
         widgets = {
             'content': forms.Textarea(attrs={'rows': 3}),
+            'video_file': forms.ClearableFileInput(attrs={'accept': 'video/*'}),
         }
 
 
