@@ -57,7 +57,8 @@
         padding: 20px;
       }
 
-      input {
+      input,
+      select {
         width: 100%;
         padding: 12px;
         border: 1px solid #d1d5db;
@@ -65,6 +66,7 @@
         font-size: 16px;
         box-sizing: border-box;
         margin-top: 8px;
+        background: #fff;
       }
 
       .btn {
@@ -125,34 +127,51 @@
         <div class="form-box">
           <form method="post">
             {% csrf_token %}
-            <label for="id_coupon_code"><strong>優惠碼</strong></label>
-            {{ form.coupon_code }}
+            <label for="couponSelect"><strong>選擇優惠券</strong></label>
 
             {% if my_coupons %}
-            <div style="margin-top:12px;">
-              <div style="font-size:14px; color:#6b7280; margin-bottom:6px;">我領取的優惠券（點選自動填入）：</div>
+            <select name="coupon_code" id="couponSelect" onchange="onCouponChange()">
+              <option value="">不使用優惠券</option>
               {% for uc in my_coupons %}
-              <button type="button"
-                onclick="document.getElementById('id_coupon_code').value='{{ uc.coupon.code }}';"
-                style="background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; padding:6px 12px; border-radius:8px; margin:3px; cursor:pointer; font-weight:bold;">
+              <option value="{{ uc.coupon.code }}" {% if selected_code == uc.coupon.code %}selected{% endif %}>
                 {{ uc.coupon.code }}（{{ uc.coupon.name }}）
-              </button>
+              </option>
               {% endfor %}
-            </div>
+            </select>
+            {% else %}
+            <p style="color:#6b7280; margin-top:8px;">
+              目前沒有可用的優惠券。<a href="{% url 'coupon_list' %}">前往領取 →</a>
+            </p>
             {% endif %}
+
             {% if success_message %}
             <div class="message-success">{{ success_message }}</div>
             {% endif %} {% if error_message %}
             <div class="message-error">{{ error_message }}</div>
             {% endif %}
 
-            <button type="submit" name="action" value="apply" class="btn" style="background:#f59e0b;">套用優惠券</button>
-            <button type="submit" name="action" value="buy" class="btn">確認購買（NT$ {{ final_price }}）</button>
-            <a href="{% url 'course_detail' course.id %}" class="btn btn-dark"
-              >返回課程</a
-            >
+            <div style="margin-top:12px;">
+              {% if my_coupons %}
+              <button type="submit" name="action" value="apply" id="applyBtn"
+                class="btn" style="background:#f59e0b; display:none;">套用優惠券</button>
+              {% endif %}
+              <button type="submit" name="action" value="buy" class="btn">確認購買（NT$ {{ final_price }}）</button>
+              <a href="{% url 'course_detail' course.id %}" class="btn btn-dark">返回課程</a>
+            </div>
           </form>
         </div>
+
+        <script>
+          function onCouponChange() {
+            var sel = document.getElementById("couponSelect");
+            var btn = document.getElementById("applyBtn");
+            if (!sel || !btn) return;
+            // 選了優惠券才顯示「套用優惠券」按鈕
+            btn.style.display = sel.value ? "inline-block" : "none";
+          }
+          // 頁面載入時依目前選擇狀態決定（套用後重整仍保持）
+          document.addEventListener("DOMContentLoaded", onCouponChange);
+        </script>
       </div>
     </div>
   </body>

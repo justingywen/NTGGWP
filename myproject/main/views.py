@@ -392,11 +392,13 @@ def checkout(request, course_id):
     final_price = original_price
     error_message = None
     success_message = None
+    selected_code = ''
 
     if request.method == 'POST':
         # action：apply=只套用預覽折扣、buy=確認購買
         action = request.POST.get('action', 'buy')
         coupon_code = request.POST.get('coupon_code', '').strip()
+        selected_code = coupon_code
 
         if coupon_code:
             try:
@@ -500,6 +502,7 @@ def checkout(request, course_id):
         'error_message': error_message,
         'success_message': success_message,
         'my_coupons': my_coupons,
+        'selected_code': selected_code,
     })
 
 
