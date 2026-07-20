@@ -26,7 +26,7 @@
         </div>
         {% if existing %}
         <p class="warn">此訂單已有一筆退款申請（狀態：{{ existing.get_status_display }}），無法重複申請。</p>
-        <a href="{% url 'my_refunds' %}" class="glass-btn ghost" style="margin-top:14px;">← 返回退款紀錄</a>
+        <a href="{% url 'my_courses' %}" class="glass-btn ghost" style="margin-top:14px;">← 返回我的課程</a>
         {% else %}
         <form method="post">
           {% csrf_token %}
@@ -34,7 +34,7 @@
           <textarea name="reason" rows="5" placeholder="請說明退款原因"></textarea>
           <div class="btn-row">
             <button type="submit" class="glass-btn danger">送出退款申請</button>
-            <a href="{% url 'my_refunds' %}" class="glass-btn ghost">取消</a>
+            <a href="{% url 'my_courses' %}" class="glass-btn ghost">取消</a>
           </div>
         </form>
         {% endif %}

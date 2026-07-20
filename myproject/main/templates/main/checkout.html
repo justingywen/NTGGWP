@@ -58,7 +58,7 @@
               {% endfor %}
             </select>
             {% else %}
-            <p class="hint">目前沒有可用的優惠券。<a href="{% url 'coupon_list' %}">前往領取 →</a></p>
+            <p class="hint">目前沒有可用的優惠券。<a href="{% url 'view_cart' %}">前往購物車領取 →</a></p>
             {% endif %}
 
             {% if success_message %}<div class="message-success">{{ success_message }}</div>{% endif %}

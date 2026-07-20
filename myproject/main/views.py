@@ -421,6 +421,15 @@ def my_courses(request):
             pct = 0
         enrollment.progress = pct
 
+        # 退款整合進我的課程：找該課的已付款訂單與退款狀態
+        order = Order.objects.filter(
+            user=request.user, course=enrollment.course, status='paid'
+        ).order_by('-id').first()
+        enrollment.order = order
+        enrollment.refund = None
+        if order:
+            enrollment.refund = Refund.objects.filter(order=order).order_by('-id').first()
+
     total_minutes = LearningRecord.objects.filter(
         user=request.user
     ).aggregate(
@@ -1346,9 +1355,24 @@ def view_cart(request):
     items = cart.items.select_related('course', 'course__teacher').all()
     total = sum(item.course.price for item in items)
 
+    # 優惠券整合進購物車：可領取 + 我的優惠券
+    now = timezone.now()
+    available_coupons = Coupon.objects.filter(
+        is_active=True, start_date__lte=now, end_date__gte=now
+    ).order_by('-created_at')
+    claimed_ids = set(
+        UserCoupon.objects.filter(user=request.user).values_list('coupon_id', flat=True)
+    )
+    my_coupons = UserCoupon.objects.filter(
+        user=request.user
+    ).select_related('coupon').order_by('-received_at')
+
     return render(request, 'main/cart.html', {
         'items': items,
         'total': total,
+        'available_coupons': available_coupons,
+        'claimed_ids': claimed_ids,
+        'my_coupons': my_coupons,
     })
 
 
@@ -1514,7 +1538,7 @@ def request_refund(request, order_id):
             title='退款申請已送出',
             content=f'訂單 #{order.id} 的退款申請已送出，等待審核。'
         )
-        return redirect('my_refunds')
+        return redirect('my_courses')
 
     return render(request, 'main/request_refund.html', {
         'order': order,
@@ -1524,18 +1548,8 @@ def request_refund(request, order_id):
 
 @login_required
 def my_refunds(request):
-    refunds = Refund.objects.filter(
-        user=request.user
-    ).select_related('order', 'order__course').order_by('-created_at')
-
-    orders = Order.objects.filter(
-        user=request.user, status='paid'
-    ).select_related('course').order_by('-created_at')
-
-    return render(request, 'main/refunds.html', {
-        'refunds': refunds,
-        'orders': orders,
-    })
+    # 退款已整合進「我的課程」，舊網址轉址過去
+    return redirect('my_courses')
 
 
 # =========================
@@ -1544,19 +1558,8 @@ def my_refunds(request):
 
 @login_required
 def coupon_list(request):
-    now = timezone.now()
-    coupons = Coupon.objects.filter(
-        is_active=True, start_date__lte=now, end_date__gte=now
-    ).order_by('-created_at')
-
-    claimed_ids = set(
-        UserCoupon.objects.filter(user=request.user).values_list('coupon_id', flat=True)
-    )
-
-    return render(request, 'main/coupons.html', {
-        'coupons': coupons,
-        'claimed_ids': claimed_ids,
-    })
+    # 優惠券領取已整合進「購物車」，舊網址轉址過去
+    return redirect('view_cart')
 
 
 @login_required
@@ -1570,18 +1573,13 @@ def claim_coupon(request, coupon_id):
             defaults={'status': 'unused'}
         )
 
-    return redirect('my_coupons')
+    return redirect('view_cart')
 
 
 @login_required
 def my_coupons(request):
-    user_coupons = UserCoupon.objects.filter(
-        user=request.user
-    ).select_related('coupon').order_by('-received_at')
-
-    return render(request, 'main/my_coupons.html', {
-        'user_coupons': user_coupons,
-    })
+    # 優惠券管理已整合進「購物車」，舊網址轉址過去
+    return redirect('view_cart')
 
 
 # =========================
@@ -2069,3 +2067,58 @@ def teacher_profile(request, teacher_id):
         'review_count': review_count,
         'recent_reviews': recent_reviews,
     })
+
+
+# =========================
+# 支援 Range 的媒體服務（開發環境播放影片用）
+# =========================
+
+def _file_iterator(path, start, length, chunk=8192):
+    with open(path, 'rb') as f:
+        f.seek(start)
+        remaining = length
+        while remaining > 0:
+            data = f.read(min(chunk, remaining))
+            if not data:
+                break
+            remaining -= len(data)
+            yield data
+
+
+def serve_media(request, path):
+    import os
+    import re
+    import mimetypes
+    from django.conf import settings
+    from django.http import StreamingHttpResponse, Http404
+
+    media_root = str(settings.MEDIA_ROOT)
+    full = os.path.normpath(os.path.join(media_root, path))
+    if not full.startswith(media_root) or not os.path.isfile(full):
+        raise Http404('media not found')
+
+    ctype = mimetypes.guess_type(full)[0] or 'application/octet-stream'
+    size = os.path.getsize(full)
+    range_header = request.META.get('HTTP_RANGE', '').strip()
+    m = re.match(r'bytes=(\d+)-(\d*)$', range_header)
+
+    if m:
+        start = int(m.group(1))
+        end = int(m.group(2)) if m.group(2) else size - 1
+        end = min(end, size - 1)
+        if start > end:
+            start = 0
+        length = end - start + 1
+        resp = StreamingHttpResponse(
+            _file_iterator(full, start, length), status=206, content_type=ctype
+        )
+        resp['Content-Range'] = f'bytes {start}-{end}/{size}'
+        resp['Content-Length'] = str(length)
+    else:
+        resp = StreamingHttpResponse(
+            _file_iterator(full, 0, size), content_type=ctype
+        )
+        resp['Content-Length'] = str(size)
+
+    resp['Accept-Ranges'] = 'bytes'
+    return resp

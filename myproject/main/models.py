@@ -198,7 +198,27 @@ class Coupon(models.Model):
                 return False
         return True
 
+    def is_expired(self):
+        return timezone.now() > self.end_date
+
+    def status_label(self):
+        """後台/前台顯示用的目前狀態文字。"""
+        now = timezone.now()
+        if not self.is_active:
+            return '已停用'
+        if self.start_date > now:
+            return '未開始'
+        if self.end_date < now:
+            return '已過期'
+        if self.usage_limit > 0 and self.usages.count() >= self.usage_limit:
+            return '已用完'
+        return '使用中'
+
     def calculate_discount(self, price):
+        # 期限/啟用/使用次數任一不符 → 一律 0 折扣（防止過期券被折抵）
+        if not self.is_valid_now():
+            return 0
+
         if price < self.min_spend:
             return 0
 
@@ -236,6 +256,12 @@ class UserCoupon(models.Model):
     )
     received_at = models.DateTimeField(auto_now_add=True, verbose_name="領取時間")
     used_at = models.DateTimeField(blank=True, null=True, verbose_name="使用時間")
+
+    def effective_status(self):
+        """顯示用：尚未使用但券已過期 → 顯示已過期。"""
+        if self.status == 'unused' and self.coupon.is_expired():
+            return '已過期'
+        return self.get_status_display()
 
     def __str__(self):
         return f"{self.user.username} - {self.coupon.code} - {self.get_status_display()}"
