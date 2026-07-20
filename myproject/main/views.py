@@ -48,6 +48,8 @@ from .forms import (
     AnswerForm,
 )
 
+from .payments import gateway
+
 
 def home(request):
     sort = request.GET.get('sort', 'newest')
@@ -500,8 +502,8 @@ def checkout(request, course_id):
         elif action == 'buy':
             success_message = None  # 沒輸入券，直接原價購買
 
-        # 只有按「確認購買」且沒有錯誤時才真正成立訂單；
-        # 按「套用優惠券」只重新整理頁面顯示折扣預覽。
+        # 只有按「確認購買」且沒有錯誤時才成立「待付款」訂單，導向付款頁；
+        # 按「套用優惠券」只重新整理頁面顯示折扣預覽。付款完成後才會開通課程。
         if action == 'buy' and not error_message:
             order = Order.objects.create(
                 user=request.user,
@@ -510,51 +512,13 @@ def checkout(request, course_id):
                 original_price=original_price,
                 discount_amount=discount_amount,
                 final_price=final_price,
-                status='paid'
+                status='pending'
             )
-
-            OrderItem.objects.create(
-                order=order,
-                course=course,
-                price=original_price
-            )
-
+            OrderItem.objects.create(order=order, course=course, price=original_price)
             Payment.objects.create(
-                order=order,
-                method='mock',
-                amount=final_price,
-                status='paid',
-                transaction_no=f'MOCK-{order.id:05d}',
-                paid_at=order.created_at
+                order=order, amount=final_price, status='pending', method='mock'
             )
-
-            Enrollment.objects.get_or_create(
-                student=request.user,
-                course=course
-            )
-
-            if coupon:
-                CouponUsage.objects.create(
-                    user=request.user,
-                    coupon=coupon,
-                    order=order,
-                    discount_amount=discount_amount
-                )
-
-                # A4：若這張券是使用者領取的，標記為已使用
-                UserCoupon.objects.filter(
-                    user=request.user,
-                    coupon=coupon,
-                    status='unused'
-                ).update(status='used', used_at=timezone.now())
-
-            Notification.objects.create(
-                user=request.user,
-                title='購買成功通知',
-                content=f'你已成功購買「{course.title}」，實付金額 NT$ {final_price}。'
-            )
-
-            return redirect('order_success', order_id=order.id)
+            return redirect('payment', order_id=order.id)
 
     # A4：帶出使用者可用的優惠券供選擇
     now = timezone.now()
@@ -587,8 +551,16 @@ def order_success(request, order_id):
         user=request.user
     )
 
+    # 未付款完成的訂單導回付款頁
+    if order.status != 'paid':
+        return redirect('payment', order_id=order.id)
+
+    payment_obj = order.payments.order_by('-id').first()
+
     return render(request, 'main/order_success.html', {
-        'order': order
+        'order': order,
+        'payment': payment_obj,
+        'items': order.items.select_related('course').all(),
     })
 
 
@@ -1407,76 +1379,160 @@ def cart_checkout(request):
             if coupon and not coupon.is_valid_now():
                 coupon = None
 
+    # 只結帳尚未購買的課程
+    items = [i for i in items if not Enrollment.objects.filter(
+        student=request.user, course=i.course).exists()]
+    if not items:
+        return redirect('view_cart')
+
     cart_total = sum(i.course.price for i in items)
-    coupon_remaining = coupon.calculate_discount(cart_total) if coupon else 0
-    coupon_used_total = 0
+    coupon_discount = coupon.calculate_discount(cart_total) if coupon else 0
 
+    total_original = 0
+    total_discount = 0
     for item in items:
-        course = item.course
-        if Enrollment.objects.filter(student=request.user, course=course).exists():
-            continue
-
-        original = course.price
-        discount = 0
-
-        # 促銷折扣
-        promo = promo_map.get(course.id)
+        original = item.course.price
+        promo = promo_map.get(item.course.id)
+        promo_disc = 0
         if promo:
             if promo.discount_type == 'amount':
-                discount += min(promo.discount_value, original)
+                promo_disc = min(promo.discount_value, original)
             else:
-                discount += int(original * promo.discount_value / 100)
+                promo_disc = int(original * promo.discount_value / 100)
+        total_original += original
+        total_discount += promo_disc
+    total_discount += coupon_discount
+    final_price = max(total_original - total_discount, 0)
 
-        price_after_promo = original - discount
-
-        # 優惠券分攤
-        coupon_here = 0
-        if coupon_remaining > 0 and price_after_promo > 0:
-            coupon_here = min(coupon_remaining, price_after_promo)
-            discount += coupon_here
-            coupon_remaining -= coupon_here
-            coupon_used_total += coupon_here
-
-        final_price = original - discount
-
-        order = Order.objects.create(
-            user=request.user,
-            course=course,
-            coupon=coupon if coupon_here > 0 else None,
-            original_price=original,
-            discount_amount=discount,
-            final_price=final_price,
-            status='paid'
-        )
-        OrderItem.objects.create(order=order, course=course, price=original)
-        Payment.objects.create(
-            order=order,
-            method='mock',
-            amount=final_price,
-            status='paid',
-            transaction_no=f'MOCK-{order.id:05d}',
-            paid_at=order.created_at
-        )
-        Enrollment.objects.get_or_create(student=request.user, course=course)
-        Notification.objects.create(
-            user=request.user,
-            title='購買成功通知',
-            content=f'你已成功購買「{course.title}」，實付金額 NT$ {final_price}。'
-        )
-        if coupon_here > 0:
-            CouponUsage.objects.create(
-                user=request.user, coupon=coupon, order=order, discount_amount=coupon_here
-            )
-
-    # 券有實際使用才標記為已用
-    if coupon and coupon_used_total > 0:
-        UserCoupon.objects.filter(
-            user=request.user, coupon=coupon, status='unused'
-        ).update(status='used', used_at=now)
+    # 建立單一「待付款」訂單（多課程訂單，course=None），付款完成後才開通
+    order = Order.objects.create(
+        user=request.user,
+        course=None,
+        coupon=coupon if coupon_discount > 0 else None,
+        original_price=total_original,
+        discount_amount=total_discount,
+        final_price=final_price,
+        status='pending'
+    )
+    for item in items:
+        OrderItem.objects.create(order=order, course=item.course, price=item.course.price)
+    Payment.objects.create(
+        order=order, amount=final_price, status='pending', method='mock'
+    )
 
     cart.items.all().delete()
 
-    return redirect('my_courses')
+    return redirect('payment', order_id=order.id)
+
+
+# =========================
+# 模擬金流 付款流程
+# =========================
+
+def _mark_payment_paid(payment, result):
+    payment.status = 'paid'
+    payment.paid_at = timezone.now()
+    if result.transaction_no:
+        payment.transaction_no = result.transaction_no
+    payment.save()
+
+
+def _finalize_paid_order(order):
+    """付款成功後：開通課程、標記優惠券、發通知（具冪等性）。"""
+    if order.status == 'paid':
+        return
+    order.status = 'paid'
+    order.save()
+
+    for item in order.items.select_related('course').all():
+        Enrollment.objects.get_or_create(student=order.user, course=item.course)
+
+    if order.coupon:
+        CouponUsage.objects.get_or_create(
+            order=order,
+            defaults={
+                'user': order.user,
+                'coupon': order.coupon,
+                'discount_amount': order.discount_amount,
+            }
+        )
+        UserCoupon.objects.filter(
+            user=order.user, coupon=order.coupon, status='unused'
+        ).update(status='used', used_at=timezone.now())
+
+    titles = '、'.join(i.course.title for i in order.items.all())
+    Notification.objects.create(
+        user=order.user,
+        title='購買成功通知',
+        content=f'你已完成付款並開通課程：{titles}（實付 NT$ {order.final_price}）。'
+    )
+
+
+@login_required
+def payment(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+
+    if order.status == 'paid':
+        return redirect('order_success', order_id=order.id)
+
+    payment_obj, _ = Payment.objects.get_or_create(
+        order=order,
+        defaults={'amount': order.final_price, 'status': 'pending', 'method': 'mock'}
+    )
+    if payment_obj.amount != order.final_price:
+        payment_obj.amount = order.final_price
+        payment_obj.save()
+
+    method = ''
+    error = None
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        method = request.POST.get('method', '')
+
+        if action == 'select':
+            # 選擇付款方式 → 準備該方式的付款資訊
+            if method == 'atm':
+                gateway.create_atm(payment_obj)
+            elif method == 'cvs':
+                gateway.create_cvs(payment_obj)
+            elif method == 'credit_card':
+                payment_obj.method = 'credit_card'
+                payment_obj.status = 'pending'
+                payment_obj.save()
+
+        elif action == 'pay_card':
+            card = {
+                'number': request.POST.get('card_number', ''),
+                'expiry': request.POST.get('card_expiry', ''),
+                'cvc': request.POST.get('card_cvc', ''),
+                'name': request.POST.get('card_name', ''),
+            }
+            result = gateway.charge_credit_card(payment_obj, card)
+            if result.success:
+                _mark_payment_paid(payment_obj, result)
+                _finalize_paid_order(order)
+                return redirect('order_success', order_id=order.id)
+            error = result.message
+            method = 'credit_card'
+
+        elif action == 'confirm_offline':
+            # 使用者回報已完成 ATM 轉帳 / 超商繳費（模擬銀行/超商回拋）
+            result = gateway.confirm_offline(payment_obj)
+            if result.success:
+                _mark_payment_paid(payment_obj, result)
+                _finalize_paid_order(order)
+                return redirect('order_success', order_id=order.id)
+            error = result.message
+            method = payment_obj.method
+
+    return render(request, 'main/payment.html', {
+        'order': order,
+        'payment': payment_obj,
+        'items': order.items.select_related('course').all(),
+        'method': method,
+        'error': error,
+    })
 
 
 # =========================

@@ -410,7 +410,8 @@ class CouponUsage(models.Model):
 class Payment(models.Model):
     PAYMENT_METHOD_CHOICES = [
         ('credit_card', '信用卡'),
-        ('atm', 'ATM轉帳'),
+        ('atm', 'ATM 虛擬帳號轉帳'),
+        ('cvs', '超商代碼繳費'),
         ('line_pay', 'LINE Pay'),
         ('cash', '現金'),
         ('mock', '模擬付款'),
@@ -448,6 +449,14 @@ class Payment(models.Model):
         null=True,
         verbose_name="交易編號"
     )
+    # 模擬金流用（未來串接真金流時由 gateway 回傳填入）
+    virtual_account = models.CharField(
+        max_length=30, blank=True, null=True, verbose_name="ATM 虛擬帳號"
+    )
+    payment_code = models.CharField(
+        max_length=30, blank=True, null=True, verbose_name="超商繳費代碼"
+    )
+    expire_at = models.DateTimeField(blank=True, null=True, verbose_name="繳費期限")
     paid_at = models.DateTimeField(blank=True, null=True, verbose_name="付款時間")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
 

@@ -20,14 +20,23 @@
     <div class="container">
       <div class="glass card">
         <div class="icon">🎉</div>
-        <h1>購買成功</h1>
-        <div class="row"><span>課程</span><strong>{{ order.course.title }}</strong></div>
+        <h1>付款完成，購買成功</h1>
+
+        {% for item in items %}
+        <div class="row"><span>{{ item.course.title }}</span><span>NT$ {{ item.price }}</span></div>
+        {% endfor %}
+
         <div class="row"><span>原價</span><span>NT$ {{ order.original_price }}</span></div>
         <div class="row"><span>折扣</span><span>− NT$ {{ order.discount_amount }}</span></div>
         {% if order.coupon %}<div class="row"><span>使用優惠券</span><span>{{ order.coupon.code }}</span></div>{% endif %}
+        {% if payment %}<div class="row"><span>付款方式</span><span>{{ payment.get_method_display }}</span></div>
+        <div class="row"><span>交易編號</span><span>{{ payment.transaction_no }}</span></div>{% endif %}
         <div class="row final"><span>實付金額</span><span>NT$ {{ order.final_price }}</span></div>
+
         <div class="btn-row">
+          {% if order.course %}
           <a href="{% url 'watch_course' order.course.id %}" class="glass-btn" style="background:linear-gradient(135deg,#16a34a,#15803d);">▶ 立即開始上課</a>
+          {% endif %}
           <a href="{% url 'my_courses' %}" class="glass-btn ghost">我的課程</a>
         </div>
       </div>
