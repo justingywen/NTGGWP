@@ -76,7 +76,7 @@ def home(request):
     else:
         qs = qs.order_by(sort_map[sort])
 
-    paginator = Paginator(qs, 6)
+    paginator = Paginator(qs, 8)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     # 評分只計算本頁課程
