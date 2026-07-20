@@ -5,7 +5,9 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Avg, Count
+from django.db.models import Sum, Avg, Count, Q
+from django.core.paginator import Paginator
+from django.urls import reverse
 
 from django.utils import timezone
 
@@ -32,6 +34,7 @@ from .models import (
     CourseAnswer,
     CourseAudit,
     Promotion,
+    CourseCategory,
 )
 
 from .forms import (
@@ -47,22 +50,53 @@ from .forms import (
 
 
 def home(request):
-    courses = list(
-        Course.objects.filter(is_published=True).select_related('teacher', 'category')
-    )
+    sort = request.GET.get('sort', 'newest')
+    q = request.GET.get('q', '').strip()
+    cat = request.GET.get('cat', '').strip()
 
-    # 課程卡的社會證明：評分、評價數、學生數
-    for c in courses:
+    qs = Course.objects.filter(is_published=True).select_related('teacher', 'category')
+
+    if q:
+        qs = qs.filter(Q(title__icontains=q) | Q(teacher__username__icontains=q))
+    if cat:
+        qs = qs.filter(category__name=cat)
+
+    qs = qs.annotate(student_count=Count('enrollment', distinct=True))
+
+    sort_map = {
+        'newest': '-created_at',
+        'popular': '-student_count',
+        'price_asc': 'price',
+        'price_desc': '-price',
+    }
+    if sort not in sort_map:
+        sort = 'newest'
+    if sort == 'popular':
+        qs = qs.order_by('-student_count', '-created_at')
+    else:
+        qs = qs.order_by(sort_map[sort])
+
+    paginator = Paginator(qs, 6)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    # 評分只計算本頁課程
+    for c in page_obj:
         stats = Review.objects.filter(course=c).aggregate(avg=Avg('rating'), n=Count('id'))
         c.avg_rating = round(stats['avg'], 1) if stats['avg'] else None
         c.review_count = stats['n']
-        c.student_count = Enrollment.objects.filter(course=c).count()
 
+    categories = CourseCategory.objects.order_by('name')
     total_students = Enrollment.objects.values('student').distinct().count()
+    total_courses = Course.objects.filter(is_published=True).count()
 
     return render(request, 'main/home.html', {
-        'courses': courses,
+        'page_obj': page_obj,
+        'sort': sort,
+        'q': q,
+        'cat': cat,
+        'categories': categories,
         'total_students': total_students,
+        'total_courses': total_courses,
     })
 
 
@@ -600,15 +634,27 @@ def watch_lesson(request, lesson_id):
     if not (enrolled or is_teacher or lesson.is_free_preview):
         return redirect('course_detail', course_id=course.id)
 
-    # 標記本單元完成 → 寫入學習紀錄（每單元只記一次）
+    # 完成條件：影片播畢且實際觀看時長 ≥ 60%（防快轉刷課）
     if request.method == 'POST' and (enrolled or is_teacher):
-        LearningRecord.objects.get_or_create(
-            user=request.user,
-            course=course,
-            lesson=lesson,
-            defaults={'minutes': lesson.duration_minutes or 30}
-        )
-        return redirect('watch_lesson', lesson_id=lesson.id)
+        try:
+            watched = float(request.POST.get('watched_seconds', 0))
+            duration = float(request.POST.get('duration', 0))
+        except (TypeError, ValueError):
+            watched, duration = 0.0, 0.0
+
+        ratio = (watched / duration) if duration > 0 else 0
+
+        if ratio >= 0.6:
+            LearningRecord.objects.get_or_create(
+                user=request.user,
+                course=course,
+                lesson=lesson,
+                defaults={'minutes': lesson.duration_minutes or 30}
+            )
+            return redirect('watch_lesson', lesson_id=lesson.id)
+
+        # 未達 60% → 不記錄，帶錯誤旗標回頁面
+        return redirect(f"{reverse('watch_lesson', args=[lesson.id])}?err=notenough")
 
     # 側欄：所有章節/單元 + 完成狀態
     chapters = course.chapters.prefetch_related('lessons').all()
@@ -633,6 +679,7 @@ def watch_lesson(request, lesson_id):
         'total_lessons': total_lessons,
         'is_completed': is_completed,
         'can_record': enrolled or is_teacher,
+        'err': request.GET.get('err'),
     })
 
 
@@ -1878,3 +1925,147 @@ def process_audit(request, audit_id):
             )
 
     return redirect('manage_audits')
+
+# =========================
+# Task 2 課程完成證書（PDF）
+# =========================
+
+def _course_completion(user, course):
+    """回傳 (total_lessons, done_count, is_complete)。"""
+    total = CourseLesson.objects.filter(chapter__course=course).count()
+    done = LearningRecord.objects.filter(
+        user=user, course=course
+    ).exclude(lesson=None).values('lesson').distinct().count()
+    is_complete = total > 0 and done >= total
+    return total, done, is_complete
+
+
+@login_required
+def certificate(request, course_id):
+    course = get_object_or_404(Course, id=course_id)
+
+    if not Enrollment.objects.filter(student=request.user, course=course).exists():
+        return redirect('course_detail', course_id=course.id)
+
+    total, done, is_complete = _course_completion(request.user, course)
+    if not is_complete:
+        return redirect('my_courses')
+
+    import io
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+
+    # 繁體中文內建 CID 字型（免安裝字型檔）
+    pdfmetrics.registerFont(UnicodeCIDFont('MSung-Light'))
+    FONT = 'MSung-Light'
+
+    buffer = io.BytesIO()
+    W, H = landscape(A4)
+    c = canvas.Canvas(buffer, pagesize=landscape(A4))
+
+    # 背景與外框
+    c.setFillColorRGB(0.97, 0.97, 1.0)
+    c.rect(0, 0, W, H, fill=1, stroke=0)
+    c.setStrokeColorRGB(0.31, 0.27, 0.90)
+    c.setLineWidth(4)
+    c.rect(15 * mm, 15 * mm, W - 30 * mm, H - 30 * mm, fill=0, stroke=1)
+    c.setStrokeColorRGB(0.49, 0.36, 0.93)
+    c.setLineWidth(1)
+    c.rect(19 * mm, 19 * mm, W - 38 * mm, H - 38 * mm, fill=0, stroke=1)
+
+    cx = W / 2
+
+    c.setFillColorRGB(0.31, 0.27, 0.90)
+    c.setFont(FONT, 40)
+    c.drawCentredString(cx, H - 55 * mm, '結業證書')
+
+    c.setFillColorRGB(0.42, 0.45, 0.5)
+    c.setFont('Helvetica', 14)
+    c.drawCentredString(cx, H - 66 * mm, 'CERTIFICATE OF COMPLETION')
+
+    c.setFillColorRGB(0.2, 0.2, 0.25)
+    c.setFont(FONT, 15)
+    c.drawCentredString(cx, H - 90 * mm, '茲證明')
+
+    c.setFillColorRGB(0.1, 0.1, 0.15)
+    c.setFont(FONT, 30)
+    c.drawCentredString(cx, H - 108 * mm, request.user.username)
+
+    c.setStrokeColorRGB(0.7, 0.7, 0.75)
+    c.setLineWidth(0.8)
+    c.line(cx - 70 * mm, H - 112 * mm, cx + 70 * mm, H - 112 * mm)
+
+    c.setFillColorRGB(0.2, 0.2, 0.25)
+    c.setFont(FONT, 15)
+    c.drawCentredString(cx, H - 126 * mm, '已完成本平台線上課程')
+
+    c.setFillColorRGB(0.31, 0.27, 0.90)
+    c.setFont(FONT, 22)
+    c.drawCentredString(cx, H - 142 * mm, course.title)
+
+    c.setFillColorRGB(0.3, 0.3, 0.35)
+    c.setFont(FONT, 13)
+    c.drawCentredString(cx, H - 158 * mm, f'授課講師：{course.teacher.username}　　完成日期：{timezone.now():%Y-%m-%d}')
+
+    c.setFillColorRGB(0.55, 0.55, 0.6)
+    c.setFont('Helvetica', 10)
+    c.drawCentredString(cx, 26 * mm, f'Course Platform　|　證書編號 CERT-{course.id:04d}-{request.user.id:04d}')
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+
+    response = HttpResponse(buffer, content_type='application/pdf')
+    filename = f'certificate_{course.id}_{request.user.id}.pdf'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+# =========================
+# Task 4 講師公開頁
+# =========================
+
+def teacher_profile(request, teacher_id):
+    teacher = get_object_or_404(User, id=teacher_id)
+
+    courses = list(
+        Course.objects.filter(teacher=teacher, is_published=True)
+        .select_related('category')
+        .annotate(student_count=Count('enrollment', distinct=True))
+        .order_by('-created_at')
+    )
+    for c in courses:
+        stats = Review.objects.filter(course=c).aggregate(avg=Avg('rating'), n=Count('id'))
+        c.avg_rating = round(stats['avg'], 1) if stats['avg'] else None
+        c.review_count = stats['n']
+
+    total_students = Enrollment.objects.filter(
+        course__teacher=teacher
+    ).values('student').distinct().count()
+
+    avg = Review.objects.filter(course__teacher=teacher).aggregate(a=Avg('rating'))['a']
+    avg_rating = round(avg, 1) if avg else None
+    review_count = Review.objects.filter(course__teacher=teacher).count()
+
+    recent_reviews = Review.objects.filter(
+        course__teacher=teacher
+    ).select_related('user', 'course').order_by('-created_at')[:6]
+
+    try:
+        role_display = teacher.profile.get_role_display()
+    except Profile.DoesNotExist:
+        role_display = ''
+
+    return render(request, 'main/teacher_profile.html', {
+        'teacher': teacher,
+        'role_display': role_display,
+        'courses': courses,
+        'course_count': len(courses),
+        'total_students': total_students,
+        'avg_rating': avg_rating,
+        'review_count': review_count,
+        'recent_reviews': recent_reviews,
+    })

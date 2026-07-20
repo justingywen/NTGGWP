@@ -80,7 +80,7 @@
               <div><b>{{ student_count }}</b> 人已購</div>
               <div><b>{{ review_count }}</b> 則評價</div>
             </div>
-            <div class="stat-row"><div>講師：<b>{{ course.teacher.username }}</b></div></div>
+            <div class="stat-row"><div>講師：<a href="{% url 'teacher_profile' course.teacher.id %}" style="color:#4338ca; font-weight:800; text-decoration:none;">{{ course.teacher.username }} →</a></div></div>
           </div>
 
           <div class="glass card">

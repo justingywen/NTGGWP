@@ -4,164 +4,47 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Power BI 資料匯出</title>
+    {% include 'main/partials/glass_head.html' %}
     <style>
-      body {
-        font-family: "Microsoft JhengHei", sans-serif;
-        background: #f7f8fb;
-        margin: 0;
-        color: #1f2937;
-      }
-
-      .container {
-        max-width: 1000px;
-        margin: 50px auto;
-        padding: 20px;
-      }
-
-      .card {
-        background: white;
-        border-radius: 20px;
-        padding: 32px;
-        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
-      }
-
-      h1 {
-        margin-top: 0;
-        font-size: 34px;
-      }
-
-      p {
-        color: #6b7280;
-        line-height: 1.8;
-      }
-
-      .section-title {
-        margin-top: 34px;
-        padding-top: 22px;
-        border-top: 1px solid #e5e7eb;
-      }
-
-      .export-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 16px;
-        margin-top: 20px;
-      }
-
-      .export-item {
-        border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        padding: 20px;
-        background: #ffffff;
-      }
-
-      .export-item h3 {
-        margin-top: 0;
-        margin-bottom: 10px;
-      }
-
-      .btn {
-        display: inline-block;
-        margin-top: 12px;
-        background: #2563eb;
-        color: white;
-        padding: 10px 18px;
-        border-radius: 10px;
-        text-decoration: none;
-        font-weight: bold;
-      }
-
-      .btn-dark {
-        background: #1f2937;
-      }
+      .container { max-width: 1040px; margin: 40px auto; padding: 0 20px; }
+      .card { padding: 30px; }
+      h1 { margin: 0 0 8px; font-size: 26px; font-weight: 800; }
+      .desc { color: var(--ink-soft); line-height: 1.8; }
+      .section-title { margin-top: 30px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.5); font-size: 18px; font-weight: 800; }
+      .export-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }
+      .export-item { padding: 18px; }
+      .export-item h3 { margin: 0 0 8px; font-size: 16px; }
+      .export-item p { color: var(--ink-soft); font-size: 14px; line-height: 1.6; margin: 0 0 12px; }
     </style>
   </head>
   <body>
     {% include 'main/partials/navbar.html' %}
-
     <div class="container">
-      <div class="card">
+      <div class="glass card">
         <h1>Power BI 資料匯出</h1>
-        <p>
-          這裡可以匯出平台資料表，提供 Power BI Desktop 建立視覺化報表。
-          建議依序下載所有 CSV，再匯入 Power BI。
-        </p>
+        <p class="desc">匯出平台資料表供 Power BI Desktop 建立視覺化報表，建議依序下載所有 CSV 再匯入。</p>
 
-        <h2 class="section-title">核心資料</h2>
-
+        <div class="section-title">核心資料</div>
         <div class="export-list">
-          <div class="export-item">
-            <h3>課程資料 courses.csv</h3>
-            <p>課程名稱、講師、分類、難度、價格與建立時間。</p>
-            <a href="{% url 'export_courses_csv' %}" class="btn">下載</a>
-          </div>
-
-          <div class="export-item">
-            <h3>購課紀錄 enrollments.csv</h3>
-            <p>學生購買課程紀錄，可分析課程銷售與購買趨勢。</p>
-            <a href="{% url 'export_enrollments_csv' %}" class="btn">下載</a>
-          </div>
-
-          <div class="export-item">
-            <h3>學習紀錄 learning_records.csv</h3>
-            <p>觀看分鐘數與觀看時間，可分析學習時數。</p>
-            <a href="{% url 'export_learning_records_csv' %}" class="btn"
-              >下載</a
-            >
-          </div>
-
-          <div class="export-item">
-            <h3>使用者角色 profiles.csv</h3>
-            <p>使用者帳號、Email 與角色。</p>
-            <a href="{% url 'export_profiles_csv' %}" class="btn">下載</a>
-          </div>
+          <div class="glass-strong export-item"><h3>課程 courses.csv</h3><p>課程名稱、講師、分類、難度、價格。</p><a href="{% url 'export_courses_csv' %}" class="glass-btn">下載</a></div>
+          <div class="glass-strong export-item"><h3>購課 enrollments.csv</h3><p>學生購買課程紀錄。</p><a href="{% url 'export_enrollments_csv' %}" class="glass-btn">下載</a></div>
+          <div class="glass-strong export-item"><h3>學習 learning_records.csv</h3><p>觀看分鐘數與時間。</p><a href="{% url 'export_learning_records_csv' %}" class="glass-btn">下載</a></div>
+          <div class="glass-strong export-item"><h3>角色 profiles.csv</h3><p>帳號、Email 與角色。</p><a href="{% url 'export_profiles_csv' %}" class="glass-btn">下載</a></div>
         </div>
 
-        <h2 class="section-title">交易與營收資料</h2>
-
+        <div class="section-title">交易與營收</div>
         <div class="export-list">
-          <div class="export-item">
-            <h3>訂單資料 orders.csv</h3>
-            <p>原價、折扣、實付金額與訂單狀態。</p>
-            <a href="{% url 'export_orders_csv' %}" class="btn">下載</a>
-          </div>
-
-          <div class="export-item">
-            <h3>訂單明細 order_items.csv</h3>
-            <p>每筆訂單購買的課程明細。</p>
-            <a href="{% url 'export_order_items_csv' %}" class="btn">下載</a>
-          </div>
-
-          <div class="export-item">
-            <h3>付款紀錄 payments.csv</h3>
-            <p>付款方式、付款金額、付款狀態與交易編號。</p>
-            <a href="{% url 'export_payments_csv' %}" class="btn">下載</a>
-          </div>
-
-          <div class="export-item">
-            <h3>優惠券使用 coupon_usage.csv</h3>
-            <p>優惠碼、使用者、訂單與折扣金額。</p>
-            <a href="{% url 'export_coupon_usage_csv' %}" class="btn">下載</a>
-          </div>
+          <div class="glass-strong export-item"><h3>訂單 orders.csv</h3><p>原價、折扣、實付與狀態。</p><a href="{% url 'export_orders_csv' %}" class="glass-btn">下載</a></div>
+          <div class="glass-strong export-item"><h3>訂單明細 order_items.csv</h3><p>每筆訂單的課程明細。</p><a href="{% url 'export_order_items_csv' %}" class="glass-btn">下載</a></div>
+          <div class="glass-strong export-item"><h3>付款 payments.csv</h3><p>付款方式、金額、狀態與交易編號。</p><a href="{% url 'export_payments_csv' %}" class="glass-btn">下載</a></div>
+          <div class="glass-strong export-item"><h3>優惠券使用 coupon_usage.csv</h3><p>優惠碼、使用者、訂單與折扣。</p><a href="{% url 'export_coupon_usage_csv' %}" class="glass-btn">下載</a></div>
         </div>
 
-        <h2 class="section-title">課程內容與評價資料</h2>
-
+        <div class="section-title">課程內容與評價</div>
         <div class="export-list">
-          <div class="export-item">
-            <h3>課程評價 reviews.csv</h3>
-            <p>學生評分與評論內容，可分析課程滿意度。</p>
-            <a href="{% url 'export_reviews_csv' %}" class="btn">下載</a>
-          </div>
-
-          <div class="export-item">
-            <h3>課程單元 course_lessons.csv</h3>
-            <p>課程章節、單元、影片分鐘數與免費試看狀態。</p>
-            <a href="{% url 'export_course_lessons_csv' %}" class="btn">下載</a>
-          </div>
+          <div class="glass-strong export-item"><h3>評價 reviews.csv</h3><p>評分與評論內容。</p><a href="{% url 'export_reviews_csv' %}" class="glass-btn">下載</a></div>
+          <div class="glass-strong export-item"><h3>單元 course_lessons.csv</h3><p>章節、單元、分鐘數與試看。</p><a href="{% url 'export_course_lessons_csv' %}" class="glass-btn">下載</a></div>
         </div>
-
-        <a href="/" class="btn btn-dark">回首頁</a>
       </div>
     </div>
   </body>

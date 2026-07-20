@@ -68,6 +68,9 @@
               <a href="{% url 'course_detail' enrollment.course.id %}" class="glass-btn ghost">課程頁</a>
               <a href="{% url 'watch_course' enrollment.course.id %}" class="glass-btn" style="background:linear-gradient(135deg,#16a34a,#15803d);">▶ 上課</a>
             </div>
+            {% if enrollment.progress == 100 %}
+            <a href="{% url 'certificate' enrollment.course.id %}" class="glass-btn warn" style="text-align:center; margin-top:8px;">🎓 下載結業證書</a>
+            {% endif %}
           </div>
         </div>
         {% endfor %}

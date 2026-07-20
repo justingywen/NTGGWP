@@ -4,34 +4,36 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>課程內容管理 - {{ course.title }}</title>
+    {% include 'main/partials/glass_head.html' %}
     <style>
-      body { font-family: "Microsoft JhengHei", sans-serif; background: #f5f7fb; margin: 0; color: #222; }
-      .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
-      .card { background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,.06); margin-bottom: 20px; }
-      h1 { color: #111827; } h2 { margin-top: 0; color: #111827; font-size: 20px; }
-      .chapter { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 14px; background: #f9fafb; }
-      .chapter-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-      .c-title { font-weight: bold; font-size: 17px; color: #111827; }
-      .lesson { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-      .meta { color: #6b7280; font-size: 13px; }
-      input, textarea, select { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; margin: 4px 0; font-size: 14px; }
+      .container { max-width: 920px; margin: 36px auto; padding: 0 20px; }
+      .card { padding: 24px; margin-bottom: 20px; }
+      h1 { margin: 0 0 6px; font-size: 26px; font-weight: 800; }
+      h2 { margin: 0 0 14px; font-size: 19px; font-weight: 800; }
+      .back { color: #4338ca; text-decoration: none; font-weight: 600; }
+      .chapter { border: 1px solid rgba(255,255,255,0.6); border-radius: 14px; padding: 16px; margin-bottom: 14px; background: rgba(255,255,255,0.4); }
+      .chapter-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .c-title { font-weight: 800; font-size: 17px; }
+      .lesson { background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.6); border-radius: 10px; padding: 10px 12px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .meta { color: var(--ink-soft); font-size: 13px; }
+      input, textarea, select { width: 100%; padding: 9px; border: 1px solid rgba(255,255,255,0.7); border-radius: 8px; box-sizing: border-box; margin: 4px 0; font-size: 14px; background: rgba(255,255,255,0.65); }
       .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
       .row > div { flex: 1; min-width: 120px; }
-      .btn { background: #2563eb; color: #fff; border: none; padding: 8px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; font-size: 14px; display: inline-block; }
-      .btn-sm { padding: 5px 10px; font-size: 13px; }
-      .btn-gray { background: #6b7280; } .btn-red { background: #ef4444; }
+      .btn-sm { padding: 7px 13px; font-size: 13px; }
       .inline { display: inline; }
-      .addbox { border-top: 1px dashed #d1d5db; margin-top: 10px; padding-top: 10px; }
-      .back { color: #374151; text-decoration: none; }
+      .addbox { border-top: 1px dashed rgba(148,163,184,0.5); margin-top: 12px; padding-top: 12px; }
+      .vid-tag { color: #16a34a; font-size: 12px; font-weight: 700; }
     </style>
   </head>
   <body>
     {% include 'main/partials/navbar.html' %}
     <div class="container">
-      <h1>課程內容管理：{{ course.title }}</h1>
-      <a href="{% url 'teacher_dashboard' %}" class="back">← 回教師專區</a>
+      <div class="glass card">
+        <h1>課程內容管理：{{ course.title }}</h1>
+        <a href="{% url 'teacher_dashboard' %}" class="back">← 回教師專區</a>
+      </div>
 
-      <div class="card" style="margin-top:16px;">
+      <div class="glass card">
         <h2>新增章節</h2>
         <form method="post" action="{% url 'add_chapter' course.id %}">
           {% csrf_token %}
@@ -40,19 +42,18 @@
             <div style="max-width:120px;">{{ chapter_form.sort_order.label }}{{ chapter_form.sort_order }}</div>
           </div>
           <div>{{ chapter_form.description.label }}{{ chapter_form.description }}</div>
-          <button type="submit" class="btn">+ 新增章節</button>
+          <button type="submit" class="glass-btn btn-sm" style="margin-top:8px;">＋ 新增章節</button>
         </form>
       </div>
 
       {% for chapter in chapters %}
-      <div class="card">
+      <div class="glass card">
         <div class="chapter-head">
           <div class="c-title">第 {{ chapter.sort_order }} 章：{{ chapter.title }}</div>
           <div>
-            <a href="{% url 'edit_chapter' chapter.id %}" class="btn btn-sm btn-gray">編輯</a>
+            <a href="{% url 'edit_chapter' chapter.id %}" class="glass-btn ghost btn-sm">編輯</a>
             <form method="post" action="{% url 'delete_chapter' chapter.id %}" class="inline" onsubmit="return confirm('確定刪除此章節與其單元？');">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-red">刪除</button>
+              {% csrf_token %}<button type="submit" class="glass-btn danger btn-sm">刪除</button>
             </form>
           </div>
         </div>
@@ -63,12 +64,12 @@
           <div>
             <strong>{{ chapter.sort_order }}-{{ lesson.sort_order }} {{ lesson.title }}</strong>
             <span class="meta">（{{ lesson.duration_minutes }} 分{% if lesson.is_free_preview %}・免費試看{% endif %}）</span>
+            {% if lesson.video_file %}<span class="vid-tag">🎬 已上傳影片</span>{% elif lesson.video_url %}<span class="vid-tag">🔗 影片連結</span>{% endif %}
           </div>
           <div>
-            <a href="{% url 'edit_lesson' lesson.id %}" class="btn btn-sm btn-gray">編輯</a>
+            <a href="{% url 'edit_lesson' lesson.id %}" class="glass-btn ghost btn-sm">編輯</a>
             <form method="post" action="{% url 'delete_lesson' lesson.id %}" class="inline" onsubmit="return confirm('確定刪除此單元？');">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-red">刪除</button>
+              {% csrf_token %}<button type="submit" class="glass-btn danger btn-sm">刪除</button>
             </form>
           </div>
         </div>
@@ -88,15 +89,13 @@
               <div>🎬 上傳影片檔（mp4）{{ lesson_form.video_file }}</div>
               <div style="max-width:130px;">試看{{ lesson_form.is_free_preview }}</div>
             </div>
-            <div class="row">
-              <div>或貼影片連結{{ lesson_form.video_url }}</div>
-            </div>
-            <button type="submit" class="btn btn-sm">+ 新增單元</button>
+            <div class="row"><div>或貼影片連結{{ lesson_form.video_url }}</div></div>
+            <button type="submit" class="glass-btn btn-sm" style="margin-top:8px;">＋ 新增單元</button>
           </form>
         </div>
       </div>
       {% empty %}
-      <div class="card"><p class="meta">尚未建立任何章節，請先於上方新增。</p></div>
+      <div class="glass card"><p class="meta">尚未建立任何章節，請先於上方新增。</p></div>
       {% endfor %}
     </div>
   </body>

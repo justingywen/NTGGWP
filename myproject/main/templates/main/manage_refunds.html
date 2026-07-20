@@ -4,58 +4,55 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>退款審核</title>
+    {% include 'main/partials/glass_head.html' %}
     <style>
-      body { font-family: "Microsoft JhengHei", sans-serif; background: #f5f7fb; margin: 0; color: #222; }
-      .container { max-width: 960px; margin: 0 auto; padding: 40px 20px; }
-      .card { background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,.06); }
-      h1 { color: #111827; }
-      .row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding: 16px 0; gap: 12px; flex-wrap: wrap; }
+      .container { max-width: 980px; margin: 40px auto; padding: 0 20px; }
+      .card { padding: 26px; }
+      h1 { margin: 0 0 12px; font-size: 26px; font-weight: 800; }
+      .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.5); flex-wrap: wrap; }
       .row:last-child { border-bottom: none; }
-      .t { font-weight: bold; color: #111827; }
-      .meta { color: #6b7280; font-size: 14px; }
-      .badge { padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: bold; }
-      .b-pending { background: #fef3c7; color: #92400e; }
-      .b-approved { background: #dbeafe; color: #1e40af; }
-      .b-rejected { background: #fee2e2; color: #991b1b; }
-      .b-completed { background: #dcfce7; color: #166534; }
-      .btn { color: #fff; border: none; padding: 8px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; }
-      .btn-ok { background: #16a34a; } .btn-no { background: #ef4444; }
+      .t { font-weight: 800; }
+      .meta { color: var(--ink-soft); font-size: 14px; }
+      .badge { padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+      .b-pending { background: rgba(245,158,11,0.18); color: #92400e; }
+      .b-approved { background: rgba(59,130,246,0.15); color: #1e40af; }
+      .b-rejected { background: rgba(239,68,68,0.15); color: #991b1b; }
+      .b-completed { background: rgba(22,163,74,0.15); color: #166534; }
+      .actions { display: flex; gap: 8px; align-items: center; }
+      .glass-btn.sm { padding: 8px 14px; font-size: 14px; }
       .inline { display: inline; }
-      .empty { color: #6b7280; }
+      .empty { color: var(--ink-soft); }
     </style>
   </head>
   <body>
     {% include 'main/partials/navbar.html' %}
     <div class="container">
-      <div class="card">
+      <div class="glass card">
         <h1>退款審核</h1>
         {% if refunds %}
           {% for r in refunds %}
           <div class="row">
             <div>
               <div class="t">{{ r.order.course.title|default:"多課程訂單" }}</div>
-              <div class="meta">
-                申請人：{{ r.user.username }} ・ 訂單 #{{ r.order.id }} ・ 退款 NT$ {{ r.amount }}<br />
-                原因：{{ r.reason }} ・ {{ r.created_at|date:"Y-m-d H:i" }}
-              </div>
+              <div class="meta">申請人：{{ r.user.username }} ・ 訂單 #{{ r.order.id }} ・ 退款 NT$ {{ r.amount }}<br />原因：{{ r.reason }} ・ {{ r.created_at|date:"Y-m-d H:i" }}</div>
             </div>
-            <div style="display:flex; gap:8px; align-items:center;">
+            <div class="actions">
               <span class="badge b-{{ r.status }}">{{ r.get_status_display }}</span>
               {% if r.status == 'pending' %}
               <form method="post" action="{% url 'process_refund' r.id %}" class="inline">
                 {% csrf_token %}<input type="hidden" name="action" value="approve" />
-                <button type="submit" class="btn btn-ok">通過</button>
+                <button type="submit" class="glass-btn sm" style="background:linear-gradient(135deg,#16a34a,#15803d);">通過</button>
               </form>
               <form method="post" action="{% url 'process_refund' r.id %}" class="inline">
                 {% csrf_token %}<input type="hidden" name="action" value="reject" />
-                <button type="submit" class="btn btn-no">拒絕</button>
+                <button type="submit" class="glass-btn danger sm">拒絕</button>
               </form>
               {% endif %}
             </div>
           </div>
           {% endfor %}
         {% else %}
-          <p class="empty">目前沒有退款申請。</p>
+        <p class="empty">目前沒有退款申請。</p>
         {% endif %}
       </div>
     </div>

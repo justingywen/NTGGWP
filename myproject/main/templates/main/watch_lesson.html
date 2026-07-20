@@ -20,6 +20,10 @@
       .lesson-content { line-height: 1.9; color: #334155; }
       .done-row { margin-top: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
       .done-tag { color: #16a34a; font-weight: 800; }
+      .watch-status { font-weight: 700; color: #334155; }
+      .watch-status #watchPct { color: #4338ca; }
+      .hint-sm { color: var(--ink-soft); font-weight: 400; font-size: 13px; margin-left: 6px; }
+      .watch-warn { margin-top: 10px; color: #b91c1c; font-weight: 700; background: rgba(239,68,68,0.1); padding: 10px 14px; border-radius: 10px; }
 
       /* 側欄 */
       .side { padding: 20px; position: sticky; top: 88px; max-height: calc(100vh - 110px); overflow-y: auto; }
@@ -72,13 +76,18 @@
                 {% if is_completed %}
                 <span class="done-tag">✓ 已完成本單元</span>
                 {% else %}
-                <form method="post">
+                <div class="watch-status">本單元觀看進度：<b id="watchPct">0%</b><span class="hint-sm">（需完整播放，且實際觀看 ≥ 60% 才算完成，快轉不計）</span></div>
+                <form method="post" id="completeForm" style="display:none;">
                   {% csrf_token %}
-                  <button type="submit" class="glass-btn" style="background:linear-gradient(135deg,#16a34a,#15803d);">標記本單元完成</button>
+                  <input type="hidden" name="watched_seconds" id="watchedSeconds" value="0" />
+                  <input type="hidden" name="duration" id="videoDuration" value="0" />
                 </form>
                 {% endif %}
                 <a href="{% url 'course_detail' course.id %}" class="glass-btn ghost">課程頁</a>
               </div>
+              {% if err == 'notenough' %}
+              <div class="watch-warn">⚠️ 實際觀看未達 60%，請勿快轉，完整看完才會標記完成。</div>
+              {% endif %}
               {% endif %}
             </div>
           </div>
@@ -90,6 +99,10 @@
             <h2>課程內容</h2>
             <div class="prog-label"><span>完成進度</span><span>{{ done_count }}/{{ total_lessons }}（{{ progress }}%）</span></div>
             <div class="bar"><i style="width: {{ progress }}%;"></i></div>
+
+            {% if progress == 100 %}
+            <a href="{% url 'certificate' course.id %}" class="glass-btn warn" style="display:block; text-align:center; margin-bottom:14px;">🎓 下載結業證書</a>
+            {% endif %}
 
             {% for chapter in chapters %}
             <div class="ch-title">第 {{ chapter.sort_order }} 章：{{ chapter.title }}</div>
@@ -113,5 +126,37 @@
         </aside>
       </div>
     </div>
+
+    <script>
+      (function () {
+        var video = document.querySelector(".video-box video");
+        var form = document.getElementById("completeForm");
+        var pctEl = document.getElementById("watchPct");
+        if (!video || !form) return; // 已完成或無影片則不啟用
+
+        var watched = new Set(); // 實際看過的「整數秒」，快轉跳過的秒不會被加入
+        var submitted = false;
+
+        video.addEventListener("timeupdate", function () {
+          if (!video.paused && !video.seeking) {
+            watched.add(Math.floor(video.currentTime));
+          }
+          var dur = Math.floor(video.duration) || 0;
+          if (dur > 0 && pctEl) {
+            var pct = Math.min(100, Math.round((watched.size / dur) * 100));
+            pctEl.textContent = pct + "%";
+          }
+        });
+
+        // 影片播畢才送出；伺服器再驗證實際觀看是否 ≥ 60%
+        video.addEventListener("ended", function () {
+          if (submitted) return;
+          submitted = true;
+          document.getElementById("watchedSeconds").value = watched.size;
+          document.getElementById("videoDuration").value = Math.floor(video.duration) || 0;
+          form.submit();
+        });
+      })();
+    </script>
   </body>
 </html>

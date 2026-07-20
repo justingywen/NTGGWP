@@ -12,6 +12,8 @@ urlpatterns = [
     path('course/<int:course_id>/purchase-success/', views.purchase_success, name='purchase_success'),
     path('course/<int:course_id>/watch/', views.watch_course, name='watch_course'),
     path('lesson/<int:lesson_id>/watch/', views.watch_lesson, name='watch_lesson'),
+    path('course/<int:course_id>/certificate/', views.certificate, name='certificate'),
+    path('teacher/<int:teacher_id>/profile/', views.teacher_profile, name='teacher_profile'),
     path('course/<int:course_id>/edit/', views.edit_course, name='edit_course'),
     path('course/<int:course_id>/delete/', views.delete_course, name='delete_course'),
 
