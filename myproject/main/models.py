@@ -160,6 +160,33 @@ class LearningRecord(models.Model):
         verbose_name_plural = "學習紀錄"
 
 
+class LessonProgress(models.Model):
+    """單元觀看進度：累積實際看過的秒數 + 續看位置（跨次保留）。"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="使用者")
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, verbose_name="課程")
+    lesson = models.ForeignKey(CourseLesson, on_delete=models.CASCADE, verbose_name="單元")
+    # 每一秒是否看過的 bitmap（'0'/'1'），跨次累積、快轉跳過的秒不會被算入
+    watched_map = models.TextField(blank=True, default='', verbose_name="已觀看秒圖")
+    watched_seconds = models.PositiveIntegerField(default=0, verbose_name="累積觀看秒數")
+    last_position = models.PositiveIntegerField(default=0, verbose_name="上次觀看位置(秒)")
+    duration = models.PositiveIntegerField(default=0, verbose_name="影片總長(秒)")
+    is_completed = models.BooleanField(default=False, verbose_name="是否完成")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+
+    def percent(self):
+        if self.duration <= 0:
+            return 0
+        return min(100, int(self.watched_seconds / self.duration * 100))
+
+    def __str__(self):
+        return f"{self.user.username} - {self.lesson.title} - {self.percent()}%"
+
+    class Meta:
+        verbose_name = "單元觀看進度"
+        verbose_name_plural = "單元觀看進度"
+        unique_together = ('user', 'lesson')
+
+
 class Coupon(models.Model):
     DISCOUNT_TYPE_CHOICES = [
         ('amount', '固定金額折扣'),

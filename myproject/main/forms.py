@@ -96,13 +96,13 @@ class ChapterForm(forms.ModelForm):
 class LessonForm(forms.ModelForm):
     class Meta:
         model = CourseLesson
-        fields = ['title', 'content', 'video_file', 'video_url', 'duration_minutes', 'sort_order', 'is_free_preview']
+        # duration_minutes 不再由老師手動填，改成上傳影片後自動偵測
+        fields = ['title', 'content', 'video_file', 'video_url', 'sort_order', 'is_free_preview']
         labels = {
             'title': '單元名稱',
             'content': '單元內容',
-            'video_file': '上傳影片檔（mp4）',
+            'video_file': '上傳影片檔（mp4，時長自動偵測）',
             'video_url': '或貼影片連結',
-            'duration_minutes': '影片分鐘數',
             'sort_order': '單元順序',
             'is_free_preview': '免費試看',
         }

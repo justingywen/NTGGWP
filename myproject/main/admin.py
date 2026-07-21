@@ -9,6 +9,7 @@ from .models import (
     CourseLesson,
     Enrollment,
     LearningRecord,
+    LessonProgress,
     Coupon,
     UserCoupon,
     Promotion,
@@ -343,6 +344,18 @@ class LearningRecordAdmin(admin.ModelAdmin):
     autocomplete_fields = ('user', 'course', 'lesson')
 
 
+@admin.register(LessonProgress)
+class LessonProgressAdmin(admin.ModelAdmin):
+    list_display = ('user', 'lesson', 'percent_display', 'last_position', 'duration', 'is_completed', 'updated_at')
+    search_fields = ('user__username', 'lesson__title', 'course__title')
+    list_filter = ('is_completed', 'updated_at')
+    autocomplete_fields = ('user', 'course', 'lesson')
+
+    @admin.display(description='觀看進度')
+    def percent_display(self, obj):
+        return f'{obj.percent()}%'
+
+
 @admin.register(Favorite)
 class FavoriteAdmin(admin.ModelAdmin):
     list_display = ('user', 'course', 'created_at')
@@ -415,7 +428,7 @@ _CUSTOM_GROUPS = [
     ('📚 課程管理', ['Course', 'CourseCategory', 'CourseChapter', 'CourseLesson', 'CourseAudit']),
     ('🧾 交易管理', ['Order', 'OrderItem', 'Payment', 'Refund', 'Enrollment']),
     ('🎯 行銷管理', ['Coupon', 'UserCoupon', 'CouponUsage', 'Promotion', 'Cart']),
-    ('👥 會員與互動', ['Profile', 'LearningRecord', 'Favorite', 'Review', 'Notification', 'CourseQuestion', 'CourseAnswer']),
+    ('👥 會員與互動', ['Profile', 'LearningRecord', 'LessonProgress', 'Favorite', 'Review', 'Notification', 'CourseQuestion', 'CourseAnswer']),
 ]
 
 _ORDER_INDEX = {

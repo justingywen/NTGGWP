@@ -1,6 +1,6 @@
 ﻿import csv
 import json
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
@@ -17,6 +17,7 @@ from .models import (
     Profile,
     Enrollment,
     LearningRecord,
+    LessonProgress,
     Coupon,
     Order,
     OrderItem,
@@ -90,6 +91,22 @@ def home(request):
     categories = CourseCategory.objects.order_by('name')
     total_students = Enrollment.objects.values('student').distinct().count()
     total_courses = Course.objects.filter(is_published=True).count()
+    avg_all = Review.objects.aggregate(a=Avg('rating'))['a']
+    avg_all = round(avg_all, 1) if avg_all else 4.8
+
+    def _decorate(qs):
+        items = list(qs)
+        for c in items:
+            stats = Review.objects.filter(course=c).aggregate(avg=Avg('rating'), n=Count('id'))
+            c.avg_rating = round(stats['avg'], 1) if stats['avg'] else None
+            c.review_count = stats['n']
+        return items
+
+    base_pub = Course.objects.filter(is_published=True).select_related('teacher', 'category')
+    popular_courses = _decorate(
+        base_pub.annotate(sc=Count('enrollment', distinct=True)).order_by('-sc', '-created_at')[:10]
+    )
+    latest_courses = _decorate(base_pub.order_by('-created_at')[:10])
 
     return render(request, 'main/home.html', {
         'page_obj': page_obj,
@@ -99,6 +116,15 @@ def home(request):
         'categories': categories,
         'total_students': total_students,
         'total_courses': total_courses,
+        'avg_all': avg_all,
+        'popular_courses': popular_courses,
+        'latest_courses': latest_courses,
+        'sort_options': [
+            ('newest', '最新'),
+            ('popular', '熱門'),
+            ('price_asc', '價格低→高'),
+            ('price_desc', '價格高→低'),
+        ],
     })
 
 
@@ -615,28 +641,6 @@ def watch_lesson(request, lesson_id):
     if not (enrolled or is_teacher or lesson.is_free_preview):
         return redirect('course_detail', course_id=course.id)
 
-    # 完成條件：影片播畢且實際觀看時長 ≥ 60%（防快轉刷課）
-    if request.method == 'POST' and (enrolled or is_teacher):
-        try:
-            watched = float(request.POST.get('watched_seconds', 0))
-            duration = float(request.POST.get('duration', 0))
-        except (TypeError, ValueError):
-            watched, duration = 0.0, 0.0
-
-        ratio = (watched / duration) if duration > 0 else 0
-
-        if ratio >= 0.6:
-            LearningRecord.objects.get_or_create(
-                user=request.user,
-                course=course,
-                lesson=lesson,
-                defaults={'minutes': lesson.duration_minutes or 30}
-            )
-            return redirect('watch_lesson', lesson_id=lesson.id)
-
-        # 未達 60% → 不記錄，帶錯誤旗標回頁面
-        return redirect(f"{reverse('watch_lesson', args=[lesson.id])}?err=notenough")
-
     # 側欄：所有章節/單元 + 完成狀態
     chapters = course.chapters.prefetch_related('lessons').all()
     completed_ids = set(
@@ -650,6 +654,15 @@ def watch_lesson(request, lesson_id):
 
     is_completed = lesson.id in completed_ids
 
+    # 本單元的累積進度與續看位置
+    prog = LessonProgress.objects.filter(user=request.user, lesson=lesson).first()
+    lesson_percent = prog.percent() if prog else 0
+    resume_position = 0
+    if prog:
+        # 尚未看到接近結尾才續看，否則從頭
+        if prog.duration and prog.last_position < prog.duration - 3:
+            resume_position = prog.last_position
+
     return render(request, 'main/watch_lesson.html', {
         'course': course,
         'lesson': lesson,
@@ -660,7 +673,73 @@ def watch_lesson(request, lesson_id):
         'total_lessons': total_lessons,
         'is_completed': is_completed,
         'can_record': enrolled or is_teacher,
-        'err': request.GET.get('err'),
+        'lesson_percent': lesson_percent,
+        'resume_position': resume_position,
+    })
+
+
+@login_required
+def save_progress(request, lesson_id):
+    """AJAX：累積觀看秒數 + 記錄續看位置；達 60% 自動標記完成。"""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+
+    lesson = get_object_or_404(
+        CourseLesson.objects.select_related('chapter__course'), id=lesson_id
+    )
+    course = lesson.chapter.course
+    enrolled = Enrollment.objects.filter(student=request.user, course=course).exists()
+    is_teacher = course.teacher_id == request.user.id
+    if not (enrolled or is_teacher):
+        return JsonResponse({'ok': False}, status=403)
+
+    prog, _ = LessonProgress.objects.get_or_create(
+        user=request.user, lesson=lesson, defaults={'course': course}
+    )
+
+    try:
+        duration = int(float(request.POST.get('duration', 0) or 0))
+        position = int(float(request.POST.get('position', 0) or 0))
+    except (TypeError, ValueError):
+        duration, position = 0, 0
+
+    new_secs = [
+        int(s) for s in request.POST.get('seconds', '').split(',')
+        if s.strip().isdigit()
+    ]
+
+    if duration > 0:
+        prog.duration = duration
+
+    # 合併新看過的秒數進 bitmap（快轉跳過的秒不會被加入）
+    n = max(len(prog.watched_map), prog.duration, (max(new_secs) + 1 if new_secs else 0))
+    bitmap = list(prog.watched_map.ljust(n, '0'))
+    for s in new_secs:
+        if 0 <= s < len(bitmap):
+            bitmap[s] = '1'
+    prog.watched_map = ''.join(bitmap)
+    prog.watched_seconds = prog.watched_map.count('1')
+    if position > 0:
+        prog.last_position = position
+
+    completed_now = False
+    if prog.duration > 0 and prog.watched_seconds / prog.duration >= 0.6 and not prog.is_completed:
+        prog.is_completed = True
+        completed_now = True
+
+    prog.save()
+
+    if completed_now:
+        minutes = lesson.duration_minutes or max(1, round(prog.duration / 60))
+        LearningRecord.objects.get_or_create(
+            user=request.user, course=course, lesson=lesson,
+            defaults={'minutes': minutes}
+        )
+
+    return JsonResponse({
+        'ok': True,
+        'progress': prog.percent(),
+        'completed': prog.is_completed,
     })
 
 
@@ -1723,6 +1802,20 @@ def delete_chapter(request, chapter_id):
     return redirect('manage_content', course_id=course.id)
 
 
+def _autoset_lesson_duration(lesson):
+    """上傳影片檔後自動偵測時長，寫回 duration_minutes（老師免手動輸入）。"""
+    if not lesson.video_file:
+        return
+    try:
+        from .videoutils import detect_duration_minutes
+        minutes = detect_duration_minutes(lesson.video_file.path)
+        if minutes > 0 and minutes != lesson.duration_minutes:
+            lesson.duration_minutes = minutes
+            lesson.save(update_fields=['duration_minutes'])
+    except Exception:
+        pass
+
+
 @login_required
 def add_lesson(request, chapter_id):
     chapter = get_object_or_404(CourseChapter, id=chapter_id)
@@ -1736,6 +1829,7 @@ def add_lesson(request, chapter_id):
             lesson = form.save(commit=False)
             lesson.chapter = chapter
             lesson.save()
+            _autoset_lesson_duration(lesson)
 
     return redirect('manage_content', course_id=course.id)
 
@@ -1750,7 +1844,8 @@ def edit_lesson(request, lesson_id):
     if request.method == 'POST':
         form = LessonForm(request.POST, request.FILES, instance=lesson)
         if form.is_valid():
-            form.save()
+            lesson = form.save()
+            _autoset_lesson_duration(lesson)
             return redirect('manage_content', course_id=course.id)
     else:
         form = LessonForm(instance=lesson)

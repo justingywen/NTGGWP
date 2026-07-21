@@ -1,224 +1,223 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{ course.title }}</title>
-    {% include 'main/partials/glass_head.html' %}
-    <style>
-      .wrap { max-width: 1160px; margin: 28px auto; padding: 0 20px; }
-      .layout { display: grid; grid-template-columns: 1fr 360px; gap: 26px; align-items: start; }
-      .card { padding: 28px; margin-bottom: 24px; }
-      h1 { margin: 0 0 12px; font-size: 32px; font-weight: 800; letter-spacing: -0.5px; }
-      h2 { margin: 0 0 16px; font-size: 22px; font-weight: 800; }
-      .detail-img { width: 100%; max-height: 380px; object-fit: cover; border-radius: 18px; margin-bottom: 22px; }
-      .tag-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
-      .tag { background: rgba(79, 70, 229, 0.12); color: #4338ca; padding: 7px 14px; border-radius: 999px; font-weight: 700; font-size: 13px; }
-      .stat-row { display: flex; gap: 22px; flex-wrap: wrap; margin: 18px 0 4px; color: var(--ink-soft); font-size: 15px; }
-      .stat-row b { color: var(--ink); font-size: 18px; }
-      .stars { color: #f59e0b; }
-      .description { line-height: 1.9; color: #334155; font-size: 16px; }
-      .points { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 22px; }
-      .points li { padding-left: 26px; position: relative; color: #334155; line-height: 1.6; }
-      .points li::before { content: "✓"; position: absolute; left: 0; color: #16a34a; font-weight: 800; }
+{% extends 'main/base_eduflow.html' %}
+{% block title %}{{ course.title }} | EduFlow{% endblock %}
 
-      /* 課綱 accordion */
-      .chapter { border: 1px solid rgba(255, 255, 255, 0.6); border-radius: 14px; margin-bottom: 12px; overflow: hidden; background: rgba(255, 255, 255, 0.4); }
-      .chapter-head { padding: 14px 18px; font-weight: 700; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-      .chapter-head:hover { background: rgba(255, 255, 255, 0.5); }
-      .chapter-body { padding: 0 18px; max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; }
-      .chapter.open .chapter-body { max-height: 1000px; padding: 6px 18px 14px; }
-      .chapter.open .arrow { transform: rotate(180deg); }
-      .arrow { transition: transform 0.25s; color: var(--ink-soft); }
-      .lesson { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; margin-top: 8px; background: rgba(255, 255, 255, 0.55); }
-      .lesson-title { font-weight: 600; }
-      .lesson-meta { color: var(--ink-soft); font-size: 14px; }
-      .free { color: #16a34a; font-weight: 700; }
+{% block content %}
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-      /* 右側購買卡 */
-      .buy-card { padding: 24px; position: sticky; top: 88px; }
-      .buy-price { font-size: 34px; font-weight: 800; color: #4338ca; margin-bottom: 6px; }
-      .buy-card .mini { color: var(--ink-soft); font-size: 14px; margin-bottom: 18px; }
-      .buy-actions { display: flex; flex-direction: column; gap: 10px; }
-      .buy-actions form { margin: 0; }
-      .w-full { width: 100%; text-align: center; }
-      .purchased-text { color: #16a34a; font-weight: 800; margin-bottom: 10px; }
+        <!-- 左：課程資訊 -->
+        <div class="lg:col-span-2">
+            <nav class="flex mb-4 text-sm text-slate-500">
+                <a href="{% url 'home' %}" class="hover:text-brand-600">首頁</a>
+                <span class="mx-2">/</span>
+                {% if course.category %}<a href="{% url 'home' %}?cat={{ course.category.name }}#courses" class="hover:text-brand-600">{{ course.category.name }}</a>
+                {% else %}<span>課程</span>{% endif %}
+            </nav>
 
-      /* 評價 & 問答 */
-      .form-box { background: rgba(255, 255, 255, 0.45); border: 1px solid rgba(255, 255, 255, 0.6); border-radius: 16px; padding: 18px; margin-bottom: 18px; }
-      .form-box select, .form-box textarea, textarea { width: 100%; padding: 11px; border: 1px solid rgba(255,255,255,0.7); border-radius: 10px; font-size: 15px; box-sizing: border-box; margin-top: 6px; background: rgba(255,255,255,0.65); }
-      .review { border-bottom: 1px solid rgba(255, 255, 255, 0.5); padding: 14px 0; }
-      .review:last-child { border-bottom: none; }
-      .review-user { font-weight: 700; }
-      .review-rating { color: #f59e0b; font-weight: 700; }
-      .empty-text { color: var(--ink-soft); line-height: 1.8; }
-      .ans { background: rgba(22, 163, 74, 0.1); border-left: 4px solid #16a34a; padding: 10px 14px; border-radius: 8px; margin: 8px 0; }
+            <h1 class="text-3xl font-black text-slate-900 mb-4">{{ course.title }}</h1>
+            <p class="text-lg text-slate-600 mb-6">{{ course.description|truncatechars:80 }}</p>
 
-      @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .buy-card { position: static; } .points { grid-template-columns: 1fr; } }
-    </style>
-  </head>
-  <body>
-    {% include 'main/partials/navbar.html' %}
-
-    <div class="wrap">
-      <div class="layout">
-        <!-- ===== 左：內容 ===== -->
-        <div>
-          <div class="glass card">
-            {% if course.image %}
-            <img src="{{ course.image.url }}" alt="{{ course.title }}" class="detail-img" />
-            {% endif %}
-            <h1>{{ course.title }}</h1>
-            <div class="tag-row">
-              {% if course.category %}<span class="tag">{{ course.category.name }}</span>{% endif %}
-              <span class="tag">{{ course.get_level_display }}</span>
-              {% if average_rating %}<span class="tag">★ {{ average_rating }} / 5</span>{% else %}<span class="tag">尚無評分</span>{% endif %}
-            </div>
-            <div class="stat-row">
-              <div><b>{{ total_lessons }}</b> 單元</div>
-              <div><b>{{ total_minutes }}</b> 分鐘</div>
-              <div><b>{{ student_count }}</b> 人已購</div>
-              <div><b>{{ review_count }}</b> 則評價</div>
-            </div>
-            <div class="stat-row"><div>講師：<a href="{% url 'teacher_profile' course.teacher.id %}" style="color:#4338ca; font-weight:800; text-decoration:none;">{{ course.teacher.username }} →</a></div></div>
-          </div>
-
-          <div class="glass card">
-            <h2>課程介紹</h2>
-            <div class="description">{{ course.description|linebreaksbr }}</div>
-          </div>
-
-          {% if chapters %}
-          <div class="glass card">
-            <h2>課程重點</h2>
-            <ul class="points">
-              {% for chapter in chapters %}{% for lesson in chapter.lessons.all %}
-              <li>{{ lesson.title }}</li>
-              {% endfor %}{% endfor %}
-            </ul>
-          </div>
-          {% endif %}
-
-          <div class="glass card">
-            <h2>課程章節與單元</h2>
-            {% if chapters %}
-              {% for chapter in chapters %}
-              <div class="chapter{% if forloop.first %} open{% endif %}">
-                <div class="chapter-head" onclick="this.parentElement.classList.toggle('open')">
-                  <span>第 {{ chapter.sort_order }} 章：{{ chapter.title }}</span>
-                  <span class="arrow">▾</span>
+            <div class="flex flex-wrap items-center gap-6 mb-8 text-sm">
+                <a href="{% url 'teacher_profile' course.teacher.id %}" class="flex items-center group">
+                    <span class="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-white flex items-center justify-center font-bold mr-3">{{ course.teacher.username|slice:":1"|upper }}</span>
+                    <span>
+                        <span class="block text-slate-900 font-bold group-hover:text-brand-600">{{ course.teacher.username }}</span>
+                        <span class="block text-slate-500">課程講師</span>
+                    </span>
+                </a>
+                <div class="border-l border-slate-300 h-8"></div>
+                <div>
+                    <p class="text-slate-500">課程評價</p>
+                    <p class="text-amber-400 font-bold">
+                        {% if average_rating %}<i class="fas fa-star"></i> {{ average_rating }} <span class="text-slate-400 font-normal">({{ review_count }} 則)</span>
+                        {% else %}<span class="text-slate-400 font-normal">尚無評分</span>{% endif %}
+                    </p>
                 </div>
-                <div class="chapter-body">
-                  {% if chapter.description %}<p class="empty-text">{{ chapter.description }}</p>{% endif %}
-                  {% for lesson in chapter.lessons.all %}
-                  <div class="lesson">
-                    <div>
-                      <div class="lesson-title">{{ chapter.sort_order }}-{{ lesson.sort_order }} {{ lesson.title }}</div>
-                      {% if lesson.content %}<div class="lesson-meta">{{ lesson.content }}</div>{% endif %}
-                    </div>
-                    <div class="lesson-meta">
-                      {{ lesson.duration_minutes }} 分{% if lesson.is_free_preview %}<br /><span class="free">免費試看</span>{% endif %}
-                    </div>
-                  </div>
-                  {% empty %}
-                  <p class="empty-text">這個章節目前還沒有單元。</p>
-                  {% endfor %}
+                <div>
+                    <p class="text-slate-500">學生人數</p>
+                    <p class="text-slate-900 font-bold">{{ student_count }} 人</p>
                 </div>
-              </div>
-              {% endfor %}
-            {% else %}
-            <p class="empty-text">目前尚未建立課程章節。</p>
-            {% endif %}
-          </div>
-
-          <!-- 評價 -->
-          <div class="glass card">
-            <h2>學生評價</h2>
-            {% if user.is_authenticated %}{% if can_review %}
-            <div class="form-box">
-              <h3 style="margin-top:0;">{% if my_review %}修改我的評價{% else %}我要評價{% endif %}</h3>
-              <form method="post">
-                {% csrf_token %}
-                <div style="margin-bottom:12px;"><label><strong>評分</strong></label><br />{{ review_form.rating }}</div>
-                <div style="margin-bottom:12px;"><label><strong>評論內容</strong></label><br />{{ review_form.comment }}</div>
-                <button type="submit" class="glass-btn">{% if my_review %}更新評價{% else %}送出評價{% endif %}</button>
-              </form>
+                <div>
+                    <p class="text-slate-500">課程內容</p>
+                    <p class="text-slate-900 font-bold">{{ total_lessons }} 單元・{{ total_minutes }} 分鐘</p>
+                </div>
             </div>
-            {% else %}<p class="empty-text">購買這門課後即可留下評價。</p>{% endif %}
-            {% else %}<p class="empty-text">登入並購買課程後即可留下評價。</p>{% endif %}
 
-            {% if reviews %}
-              {% for review in reviews %}
-              <div class="review">
-                <div class="review-user">{{ review.user.username }}</div>
-                <div class="review-rating">{{ review.rating }} / 5 星</div>
-                {% if review.comment %}<p>{{ review.comment }}</p>{% endif %}
-              </div>
-              {% endfor %}
-            {% else %}<p class="empty-text">目前尚無學生評價。</p>{% endif %}
-          </div>
-
-          <!-- 問答 -->
-          <div class="glass card">
-            <h2>課程問答</h2>
-            {% if user.is_authenticated and already_purchased or is_course_teacher %}
-            <div class="form-box">
-              <h3 style="margin-top:0;">我要提問</h3>
-              <form method="post" action="{% url 'add_question' course.id %}">
-                {% csrf_token %}
-                <div style="margin-bottom:10px;"><label><strong>問題標題</strong></label><br />{{ question_form.title }}</div>
-                <div style="margin-bottom:10px;"><label><strong>問題內容</strong></label><br />{{ question_form.content }}</div>
-                <button type="submit" class="glass-btn">送出問題</button>
-              </form>
+            <!-- Tabs -->
+            <div class="border-b border-slate-200 mb-6">
+                <div class="flex space-x-8" data-tabs>
+                    <button data-tab="intro" class="border-b-2 border-brand-600 py-4 text-brand-600 font-bold">課程介紹</button>
+                    <button data-tab="curriculum" class="border-b-2 border-transparent py-4 text-slate-500 hover:text-slate-700">章節規劃</button>
+                    <button data-tab="reviews" class="border-b-2 border-transparent py-4 text-slate-500 hover:text-slate-700">學生評價</button>
+                    <button data-tab="qa" class="border-b-2 border-transparent py-4 text-slate-500 hover:text-slate-700">課程問答</button>
+                </div>
             </div>
-            {% else %}<p class="empty-text">購買課程後即可在此提問。</p>{% endif %}
 
-            {% for q in questions %}
-            <div class="review">
-              <div class="review-user">Q：{{ q.title }}</div>
-              <div class="lesson-meta">{{ q.user.username }} ・ {{ q.created_at|date:"Y-m-d" }}</div>
-              {% if q.content %}<p>{{ q.content }}</p>{% endif %}
-              {% for ans in q.answers.all %}
-              <div class="ans"><strong style="color:#166534;">A（{{ ans.user.username }}）：</strong>{{ ans.content }}</div>
-              {% endfor %}
-              {% if is_course_teacher or user.is_superuser %}
-              <form method="post" action="{% url 'add_answer' q.id %}" style="margin-top:8px;">
-                {% csrf_token %}{{ answer_form.content }}
-                <button type="submit" class="glass-btn" style="margin-top:8px; padding:8px 16px;">回覆</button>
-              </form>
-              {% endif %}
+            <!-- Tab: 課程介紹 -->
+            <div data-panel="intro">
+                <h2 class="text-xl font-bold text-slate-900 mb-4">課程簡介</h2>
+                <div class="text-slate-700 leading-relaxed whitespace-pre-line mb-8">{{ course.description }}</div>
+                {% if chapters %}
+                <h2 class="text-xl font-bold text-slate-900 mb-4">你將會學到</h2>
+                <ul class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-8">
+                    {% for chapter in chapters %}{% for lesson in chapter.lessons.all %}
+                    <li class="text-slate-700"><i class="fas fa-check text-green-500 mr-2"></i>{{ lesson.title }}</li>
+                    {% endfor %}{% endfor %}
+                </ul>
+                {% endif %}
             </div>
-            {% empty %}<p class="empty-text">目前還沒有任何提問。</p>{% endfor %}
-          </div>
+
+            <!-- Tab: 章節規劃 -->
+            <div data-panel="curriculum" class="hidden">
+                <h2 class="text-xl font-bold text-slate-900 mb-4">課程章節</h2>
+                {% if chapters %}
+                <div class="space-y-3">
+                    {% for chapter in chapters %}
+                    <div class="border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="flex items-center justify-between px-4 py-3 bg-slate-50 font-bold text-slate-800">
+                            <span>第 {{ chapter.sort_order }} 章：{{ chapter.title }}</span>
+                            <span class="text-sm text-slate-400 font-normal">{{ chapter.lessons.all|length }} 單元</span>
+                        </div>
+                        <ul class="divide-y divide-slate-100">
+                            {% for lesson in chapter.lessons.all %}
+                            <li class="flex items-center justify-between px-4 py-3 text-sm">
+                                <span class="text-slate-700"><i class="fas fa-circle-play text-slate-300 mr-2"></i>{{ chapter.sort_order }}-{{ lesson.sort_order }} {{ lesson.title }}</span>
+                                <span class="text-slate-400">{{ lesson.duration_minutes }} 分{% if lesson.is_free_preview %} <span class="text-green-500 font-bold ml-1">免費試看</span>{% endif %}</span>
+                            </li>
+                            {% empty %}<li class="px-4 py-3 text-sm text-slate-400">此章節尚無單元</li>{% endfor %}
+                        </ul>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}<p class="text-slate-400">目前尚未建立課程章節。</p>{% endif %}
+            </div>
+
+            <!-- Tab: 學生評價 -->
+            <div data-panel="reviews" class="hidden">
+                <h2 class="text-xl font-bold text-slate-900 mb-4">學生評價</h2>
+                {% if user.is_authenticated and can_review %}
+                <div class="bg-slate-50 rounded-xl p-5 mb-6">
+                    <h3 class="font-bold text-slate-800 mb-3">{% if my_review %}修改我的評價{% else %}我要評價{% endif %}</h3>
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">{{ review_form.rating }}</div>
+                        <div class="mb-3">{{ review_form.comment }}</div>
+                        <button type="submit" class="bg-brand-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-brand-700 transition">{% if my_review %}更新評價{% else %}送出評價{% endif %}</button>
+                    </form>
+                </div>
+                {% elif not user.is_authenticated %}<p class="text-slate-400 mb-6">登入並購買課程後即可留下評價。</p>
+                {% else %}<p class="text-slate-400 mb-6">購買這門課後即可留下評價。</p>{% endif %}
+
+                {% for review in reviews %}
+                <div class="border-b border-slate-100 py-4">
+                    <div class="flex items-center gap-3 mb-1">
+                        <span class="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-bold">{{ review.user.username|slice:":1"|upper }}</span>
+                        <span class="font-bold text-slate-800">{{ review.user.username }}</span>
+                        <span class="text-amber-400 text-sm">{% for i in "12345"|make_list %}{% if forloop.counter <= review.rating %}<i class="fas fa-star"></i>{% else %}<i class="far fa-star"></i>{% endif %}{% endfor %}</span>
+                    </div>
+                    {% if review.comment %}<p class="text-slate-600 pl-11">{{ review.comment }}</p>{% endif %}
+                </div>
+                {% empty %}<p class="text-slate-400">目前尚無學生評價。</p>{% endfor %}
+            </div>
+
+            <!-- Tab: 課程問答 -->
+            <div data-panel="qa" class="hidden">
+                <h2 class="text-xl font-bold text-slate-900 mb-4">課程問答</h2>
+                {% if user.is_authenticated and already_purchased or is_course_teacher %}
+                <div class="bg-slate-50 rounded-xl p-5 mb-6">
+                    <h3 class="font-bold text-slate-800 mb-3">我要提問</h3>
+                    <form method="post" action="{% url 'add_question' course.id %}">
+                        {% csrf_token %}
+                        <div class="mb-3">{{ question_form.title }}</div>
+                        <div class="mb-3">{{ question_form.content }}</div>
+                        <button type="submit" class="bg-brand-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-brand-700 transition">送出問題</button>
+                    </form>
+                </div>
+                {% else %}<p class="text-slate-400 mb-6">購買課程後即可在此提問。</p>{% endif %}
+
+                {% for q in questions %}
+                <div class="border-b border-slate-100 py-4">
+                    <p class="font-bold text-slate-800">Q：{{ q.title }}</p>
+                    <p class="text-xs text-slate-400 mb-1">{{ q.user.username }} ・ {{ q.created_at|date:"Y-m-d" }}</p>
+                    {% if q.content %}<p class="text-slate-600 mb-2">{{ q.content }}</p>{% endif %}
+                    {% for ans in q.answers.all %}
+                    <div class="bg-green-50 border-l-4 border-green-500 rounded-r-lg px-4 py-2 my-2 text-sm">
+                        <span class="font-bold text-green-700">A（{{ ans.user.username }}）：</span>{{ ans.content }}
+                    </div>
+                    {% endfor %}
+                    {% if is_course_teacher or user.is_superuser %}
+                    <form method="post" action="{% url 'add_answer' q.id %}" class="mt-2">
+                        {% csrf_token %}{{ answer_form.content }}
+                        <button type="submit" class="mt-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-900 transition">回覆</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% empty %}<p class="text-slate-400">目前還沒有任何提問。</p>{% endfor %}
+            </div>
         </div>
 
-        <!-- ===== 右：購買卡 ===== -->
-        <aside>
-          <div class="glass buy-card">
-            <div class="buy-price">NT$ {{ course.price }}</div>
-            <div class="mini">一次購買，永久觀看 ・ {{ total_lessons }} 單元 / {{ total_minutes }} 分鐘</div>
-            {% if user.is_authenticated %}
-              {% if already_purchased %}
-              <p class="purchased-text">✓ 你已擁有這門課程</p>
-              <a href="{% url 'watch_course' course.id %}" class="glass-btn w-full" style="background:linear-gradient(135deg,#16a34a,#15803d);">▶ 開始上課</a>
-              {% else %}
-              <div class="buy-actions">
-                <a href="{% url 'checkout' course.id %}" class="glass-btn w-full">前往結帳</a>
-                <form method="post" action="{% url 'add_to_cart' course.id %}">{% csrf_token %}
-                  <button type="submit" class="glass-btn ghost w-full">加入購物車</button></form>
-                <form method="post" action="{% url 'toggle_favorite' course.id %}">{% csrf_token %}
-                  <input type="hidden" name="next" value="{% url 'course_detail' course.id %}" />
-                  <button type="submit" class="glass-btn w-full" style="background:{% if is_favorited %}linear-gradient(135deg,#ef4444,#dc2626){% else %}linear-gradient(135deg,#f59e0b,#f97316){% endif %};">
-                    {% if is_favorited %}♥ 取消收藏{% else %}♡ 收藏課程{% endif %}</button></form>
-              </div>
-              {% endif %}
-            {% else %}
-            <a href="{% url 'login' %}" class="glass-btn w-full">登入後購買</a>
-            {% endif %}
-            <a href="{% url 'home' %}" class="glass-btn ghost w-full" style="margin-top:10px;">← 回課程列表</a>
-          </div>
-        </aside>
-      </div>
+        <!-- 右：購買側欄 -->
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-xl shadow-lg p-6 sticky top-24 ring-1 ring-slate-100">
+                <div class="aspect-video bg-slate-200 rounded-lg mb-4 overflow-hidden">
+                    {% if course.image %}<img src="{{ course.image.url }}" alt="{{ course.title }}" class="w-full h-full object-cover">
+                    {% else %}<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand-400 to-violet-400 text-white text-4xl font-black">{{ course.title|slice:":1"|upper }}</div>{% endif %}
+                </div>
+                <div class="mb-6">
+                    <span class="text-3xl font-black text-slate-900">NT$ {{ course.price }}</span>
+                </div>
+
+                {% if user.is_authenticated %}
+                    {% if already_purchased %}
+                    <p class="text-green-600 font-bold mb-3 flex items-center gap-2"><i class="fas fa-circle-check"></i> 你已擁有這門課程</p>
+                    <a href="{% url 'watch_course' course.id %}" class="block text-center w-full bg-green-600 text-white py-3 rounded-lg font-bold text-lg mb-3 hover:bg-green-700 transition">▶ 開始上課</a>
+                    {% else %}
+                    <a href="{% url 'checkout' course.id %}" class="block text-center w-full bg-brand-600 text-white py-3 rounded-lg font-bold text-lg mb-3 hover:bg-brand-700 transition">立即購買</a>
+                    <form method="post" action="{% url 'add_to_cart' course.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="w-full border border-brand-600 text-brand-600 py-3 rounded-lg font-bold text-lg mb-3 hover:bg-brand-50 transition">加入購物車</button>
+                    </form>
+                    <form method="post" action="{% url 'toggle_favorite' course.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% url 'course_detail' course.id %}">
+                        <button type="submit" class="w-full py-3 rounded-lg font-bold mb-6 transition {% if is_favorited %}bg-red-50 text-red-500 border border-red-200{% else %}bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100{% endif %}">
+                            {% if is_favorited %}<i class="fas fa-heart"></i> 已收藏{% else %}<i class="far fa-heart"></i> 加入收藏{% endif %}
+                        </button>
+                    </form>
+                    {% endif %}
+                {% else %}
+                <a href="{% url 'login' %}" class="block text-center w-full bg-brand-600 text-white py-3 rounded-lg font-bold text-lg mb-6 hover:bg-brand-700 transition">登入後購買</a>
+                {% endif %}
+
+                <div class="text-sm text-slate-600 space-y-3">
+                    <p><i class="fas fa-infinity mr-2 text-brand-500"></i> 永久觀看權限</p>
+                    <p><i class="fas fa-mobile-alt mr-2 text-brand-500"></i> 支援行動裝置觀看</p>
+                    <p><i class="fas fa-certificate mr-2 text-brand-500"></i> 完課證書</p>
+                    <p><i class="fas fa-shield-halved mr-2 text-brand-500"></i> 7 天不滿意退款保障</p>
+                </div>
+            </div>
+        </div>
     </div>
-  </body>
-</html>
+</main>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('[data-tabs] [data-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+        const name = btn.dataset.tab;
+        document.querySelectorAll('[data-tabs] [data-tab]').forEach((b) => {
+            const on = b === btn;
+            b.classList.toggle('border-brand-600', on);
+            b.classList.toggle('text-brand-600', on);
+            b.classList.toggle('font-bold', on);
+            b.classList.toggle('border-transparent', !on);
+            b.classList.toggle('text-slate-500', !on);
+        });
+        document.querySelectorAll('[data-panel]').forEach((p) => {
+            p.classList.toggle('hidden', p.dataset.panel !== name);
+        });
+    });
+});
+</script>
+{% endblock %}

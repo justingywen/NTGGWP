@@ -82,11 +82,10 @@
             {% csrf_token %}
             <div class="row">
               <div>單元名稱{{ lesson_form.title }}</div>
-              <div style="max-width:100px;">分鐘{{ lesson_form.duration_minutes }}</div>
               <div style="max-width:90px;">順序{{ lesson_form.sort_order }}</div>
             </div>
             <div class="row">
-              <div>🎬 上傳影片檔（mp4）{{ lesson_form.video_file }}</div>
+              <div>🎬 上傳影片檔（mp4，時長自動偵測）{{ lesson_form.video_file }}</div>
               <div style="max-width:130px;">試看{{ lesson_form.is_free_preview }}</div>
             </div>
             <div class="row"><div>或貼影片連結{{ lesson_form.video_url }}</div></div>
