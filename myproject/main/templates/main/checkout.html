@@ -1,90 +1,63 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>課程結帳</title>
-    {% include 'main/partials/glass_head.html' %}
-    <style>
-      .container { max-width: 720px; margin: 40px auto; padding: 0 20px; }
-      .checkout-card { padding: 34px; }
-      h1 { margin: 0 0 6px; font-size: 30px; font-weight: 800; }
-      .sub { color: var(--ink-soft); margin-bottom: 22px; }
-      .course-title { font-size: 22px; font-weight: 800; }
-      .teacher { color: var(--ink-soft); margin: 4px 0 20px; }
-      .row {
-        display: flex; justify-content: space-between; align-items: center;
-        padding: 14px 0; font-size: 17px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-      }
-      .row.final { font-size: 22px; font-weight: 800; color: #4338ca; border-bottom: none; }
-      .coupon-box { margin-top: 22px; padding: 22px; border-radius: 18px; }
-      .coupon-box label { font-weight: 700; display: block; margin-bottom: 10px; }
-      select.glass-input { appearance: none; cursor: pointer; }
-      .message-success { color: #15803d; font-weight: 700; margin-top: 12px; }
-      .message-error { color: #b91c1c; font-weight: 700; margin-top: 12px; }
-      .btn-row { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
-      .hint { color: var(--ink-soft); margin-top: 8px; }
-      @media (max-width: 560px) { .checkout-card { padding: 24px; } h1 { font-size: 26px; } }
-    </style>
-  </head>
-  <body>
-    {% include 'main/partials/navbar.html' %}
+{% extends 'main/base_eduflow.html' %}
+{% block title %}課程結帳 | EduFlow{% endblock %}
 
-    <div class="container">
-      <div class="glass checkout-card">
-        <h1>課程結帳</h1>
-        <div class="sub">確認訂單並套用你的優惠券</div>
+{% block content %}
+<main class="max-w-2xl mx-auto px-4 py-10">
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8">
+    <h1 class="text-2xl font-black text-slate-900 mb-1">課程結帳</h1>
+    <p class="text-slate-500 mb-6">確認訂單並套用你的優惠券</p>
 
-        <div class="course-title">{{ course.title }}</div>
-        <div class="teacher">講師：{{ course.teacher.username }}</div>
+    <div class="text-xl font-bold text-slate-900">{{ course.title }}</div>
+    <div class="text-slate-500 mb-5">講師：{{ course.teacher.username }}</div>
 
-        <div class="row"><span>課程原價</span><strong>NT$ {{ original_price }}</strong></div>
-        <div class="row"><span>折扣金額</span><strong>− NT$ {{ discount_amount }}</strong></div>
-        <div class="row final"><span>實付金額</span><span>NT$ {{ final_price }}</span></div>
-
-        <div class="glass-strong coupon-box">
-          <form method="post">
-            {% csrf_token %}
-            <label for="couponSelect">選擇優惠券</label>
-
-            {% if my_coupons %}
-            <select name="coupon_code" id="couponSelect" class="glass-input" onchange="onCouponChange()">
-              <option value="">不使用優惠券</option>
-              {% for uc in my_coupons %}
-              <option value="{{ uc.coupon.code }}" {% if selected_code == uc.coupon.code %}selected{% endif %}>
-                {{ uc.coupon.code }}（{{ uc.coupon.name }}）
-              </option>
-              {% endfor %}
-            </select>
-            {% else %}
-            <p class="hint">目前沒有可用的優惠券。<a href="{% url 'view_cart' %}">前往購物車領取 →</a></p>
-            {% endif %}
-
-            {% if success_message %}<div class="message-success">{{ success_message }}</div>{% endif %}
-            {% if error_message %}<div class="message-error">{{ error_message }}</div>{% endif %}
-
-            <div class="btn-row">
-              {% if my_coupons %}
-              <button type="submit" name="action" value="apply" id="applyBtn"
-                class="glass-btn warn" style="display:none;">套用優惠券</button>
-              {% endif %}
-              <button type="submit" name="action" value="buy" class="glass-btn">前往付款（NT$ {{ final_price }}）</button>
-              <a href="{% url 'course_detail' course.id %}" class="glass-btn ghost">返回課程</a>
-            </div>
-          </form>
-        </div>
-      </div>
+    <div class="divide-y divide-slate-100 mb-2">
+      <div class="flex justify-between py-3 text-slate-700"><span>課程原價</span><strong>NT$ {{ original_price }}</strong></div>
+      <div class="flex justify-between py-3 text-slate-700"><span>折扣金額</span><strong>− NT$ {{ discount_amount }}</strong></div>
+      <div class="flex justify-between py-3 text-xl font-black text-brand-700"><span>實付金額</span><span>NT$ {{ final_price }}</span></div>
     </div>
 
-    <script>
-      function onCouponChange() {
-        var sel = document.getElementById("couponSelect");
-        var btn = document.getElementById("applyBtn");
-        if (!sel || !btn) return;
-        btn.style.display = sel.value ? "inline-block" : "none";
-      }
-      document.addEventListener("DOMContentLoaded", onCouponChange);
-    </script>
-  </body>
-</html>
+    <div class="bg-slate-50 rounded-xl p-5 mt-5">
+      <form method="post">
+        {% csrf_token %}
+        <label for="couponSelect" class="block font-bold text-slate-700 mb-2">選擇優惠券</label>
+
+        {% if my_coupons %}
+        <select name="coupon_code" id="couponSelect" onchange="onCouponChange()"
+                class="w-full border border-slate-200 rounded-lg py-2.5 px-3 bg-white outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-200 transition appearance-none cursor-pointer">
+          <option value="">不使用優惠券</option>
+          {% for uc in my_coupons %}
+          <option value="{{ uc.coupon.code }}" {% if selected_code == uc.coupon.code %}selected{% endif %}>{{ uc.coupon.code }}（{{ uc.coupon.name }}）</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <p class="text-slate-500">目前沒有可用的優惠券。<a href="{% url 'view_cart' %}" class="text-brand-600 hover:underline">前往購物車領取 →</a></p>
+        {% endif %}
+
+        {% if success_message %}<div class="text-green-600 font-bold mt-3">{{ success_message }}</div>{% endif %}
+        {% if error_message %}<div class="text-red-600 font-bold mt-3">{{ error_message }}</div>{% endif %}
+
+        <div class="flex gap-3 flex-wrap mt-5">
+          {% if my_coupons %}
+          <button type="submit" name="action" value="apply" id="applyBtn"
+                  class="bg-accent-500 hover:bg-accent-600 text-white font-bold px-5 py-2.5 rounded-lg transition" style="display:none;">套用優惠券</button>
+          {% endif %}
+          <button type="submit" name="action" value="buy" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-6 py-2.5 rounded-lg transition">前往付款（NT$ {{ final_price }}）</button>
+          <a href="{% url 'course_detail' course.id %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">返回課程</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function onCouponChange() {
+    var sel = document.getElementById("couponSelect");
+    var btn = document.getElementById("applyBtn");
+    if (!sel || !btn) return;
+    btn.style.display = sel.value ? "inline-block" : "none";
+  }
+  document.addEventListener("DOMContentLoaded", onCouponChange);
+</script>
+{% endblock %}

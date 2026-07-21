@@ -1,34 +1,19 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>註冊帳號</title>
-    {% include 'main/partials/glass_head.html' %}
-    <style>
-      .container { max-width: 500px; margin: 56px auto; padding: 0 20px; }
-      .auth-card { padding: 34px; }
-      h1 { margin: 0 0 8px; font-size: 30px; font-weight: 800; }
-      .desc { color: var(--ink-soft); margin-bottom: 22px; line-height: 1.7; }
-      form p { margin-bottom: 16px; }
-      label { display: block; margin-bottom: 6px; font-weight: 700; }
-      input, select { width: 100%; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.7); border-radius: 10px; font-size: 16px; background: rgba(255,255,255,0.6); box-sizing: border-box; }
-      .errorlist { color: #b91c1c; padding-left: 18px; margin: 8px 0; font-weight: 600; }
-      .back { display: inline-block; margin-top: 16px; color: #4338ca; text-decoration: none; font-weight: 600; }
-    </style>
-  </head>
-  <body>
-    {% include 'main/partials/navbar.html' %}
-    <div class="container">
-      <div class="glass auth-card">
-        <h1>註冊帳號</h1>
-        <p class="desc">填寫帳號資訊，並選擇你的身分是學生或老師。</p>
-        <form method="post">
-          {% csrf_token %} {{ form.as_p }}
-          <button type="submit" class="glass-btn" style="width:100%;">註冊</button>
-        </form>
-        <a href="/" class="back">回首頁</a>
-      </div>
+{% extends 'main/base_eduflow.html' %}
+{% block title %}註冊帳號 | EduFlow{% endblock %}
+
+{% block content %}
+<main class="max-w-md mx-auto px-4 py-14">
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8">
+    <h1 class="text-2xl font-black text-slate-900 mb-1">註冊帳號</h1>
+    <p class="text-slate-500 mb-6">填寫帳號資訊，並選擇你的身分是學生或老師。</p>
+    <div class="ef-form">
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-lg transition mt-2">註冊</button>
+      </form>
     </div>
-  </body>
-</html>
+    <p class="text-sm text-slate-500 mt-4 text-center">已經有帳號了？<a href="{% url 'login' %}" class="text-brand-600 hover:underline">前往登入</a></p>
+  </div>
+</main>
+{% endblock %}

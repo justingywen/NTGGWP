@@ -1,115 +1,83 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>訂單付款</title>
-    {% include 'main/partials/glass_head.html' %}
-    <style>
-      .container { max-width: 720px; margin: 40px auto; padding: 0 20px; }
-      .card { padding: 30px; margin-bottom: 20px; }
-      h1 { margin: 0 0 6px; font-size: 28px; font-weight: 800; }
-      .sim-tag { display: inline-block; background: rgba(245,158,11,0.18); color: #92400e; font-weight: 700; font-size: 13px; padding: 3px 12px; border-radius: 999px; margin-bottom: 14px; }
-      .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.5); }
-      .row:last-of-type { border-bottom: none; }
-      .row.final { font-size: 20px; font-weight: 800; color: #4338ca; }
-      h2 { font-size: 18px; font-weight: 800; margin: 0 0 14px; }
-      .methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-      .m-btn { padding: 20px 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.6); background: rgba(255,255,255,0.5); cursor: pointer; text-align: center; font-weight: 700; font-size: 15px; }
-      .m-btn:hover { border-color: var(--brand); }
-      .m-btn.active { background: linear-gradient(135deg, rgba(79,70,229,0.15), rgba(124,58,237,0.15)); border-color: var(--brand); }
-      .m-btn .ico { font-size: 30px; display: block; margin-bottom: 8px; }
-      .pay-panel { margin-top: 20px; padding: 22px; border-radius: 16px; }
-      label { display: block; font-weight: 700; margin: 12px 0 4px; }
-      input { width: 100%; padding: 12px; border: 1px solid rgba(255,255,255,0.7); border-radius: 10px; font-size: 15px; box-sizing: border-box; background: rgba(255,255,255,0.7); }
-      .two { display: flex; gap: 12px; }
-      .two > div { flex: 1; }
-      .info-line { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed rgba(148,163,184,0.5); }
-      .big-code { font-size: 26px; font-weight: 800; letter-spacing: 3px; color: #4338ca; }
-      .hint { color: var(--ink-soft); font-size: 13px; margin-top: 8px; line-height: 1.6; }
-      .err { background: rgba(239,68,68,0.12); color: #b91c1c; font-weight: 700; padding: 12px 14px; border-radius: 10px; margin-bottom: 12px; }
-      .back { display: inline-block; margin-top: 14px; color: #4338ca; text-decoration: none; font-weight: 600; }
-    </style>
-  </head>
-  <body>
-    {% include 'main/partials/navbar.html' %}
-    <div class="container">
-      <div class="glass card">
-        <span class="sim-tag">🧪 模擬金流（未串接真實金流）</span>
-        <h1>訂單付款</h1>
-        {% for item in items %}
-        <div class="row"><span>{{ item.course.title }}</span><span>NT$ {{ item.price }}</span></div>
-        {% endfor %}
-        <div class="row"><span>折扣</span><span>− NT$ {{ order.discount_amount }}</span></div>
-        <div class="row final"><span>應付金額</span><span>NT$ {{ order.final_price }}</span></div>
-      </div>
+{% extends 'main/base_eduflow.html' %}
+{% block title %}訂單付款 | EduFlow{% endblock %}
 
-      <div class="glass card">
-        <h2>選擇付款方式</h2>
-        <div class="methods">
-          <form method="post"><input type="hidden" name="action" value="select" /><input type="hidden" name="method" value="credit_card" />
-            <button type="submit" class="m-btn {% if method == 'credit_card' or payment.method == 'credit_card' and not method %}active{% endif %}" style="width:100%;"><span class="ico">💳</span>信用卡</button></form>
-          <form method="post"><input type="hidden" name="action" value="select" /><input type="hidden" name="method" value="atm" />
-            <button type="submit" class="m-btn {% if method == 'atm' %}active{% endif %}" style="width:100%;"><span class="ico">🏧</span>ATM 轉帳</button></form>
-          <form method="post"><input type="hidden" name="action" value="select" /><input type="hidden" name="method" value="cvs" />
-            <button type="submit" class="m-btn {% if method == 'cvs' %}active{% endif %}" style="width:100%;"><span class="ico">🏪</span>超商代碼</button></form>
-        </div>
-
-        {% if error %}<div class="err" style="margin-top:16px;">{{ error }}</div>{% endif %}
-
-        <!-- 信用卡 -->
-        {% if method == 'credit_card' %}
-        <div class="glass-strong pay-panel">
-          <form method="post">
-            <input type="hidden" name="action" value="pay_card" />
-            <input type="hidden" name="method" value="credit_card" />
-            <label>持卡人姓名</label>
-            <input type="text" name="card_name" placeholder="WANG XIAO MING" required />
-            <label>卡號</label>
-            <input type="text" name="card_number" inputmode="numeric" placeholder="4242 4242 4242 4242" required />
-            <div class="two">
-              <div><label>有效期限</label><input type="text" name="card_expiry" placeholder="MM/YY" required /></div>
-              <div><label>安全碼 CVC</label><input type="text" name="card_cvc" inputmode="numeric" placeholder="123" required /></div>
-            </div>
-            <button type="submit" class="glass-btn" style="width:100%; margin-top:16px;">確認付款 NT$ {{ order.final_price }}</button>
-            <div class="hint">🧪 測試卡：<b>4242 4242 4242 4242</b> 付款成功；卡號結尾 <b>0000</b> 模擬失敗。此為模擬，不會儲存卡號。</div>
-          </form>
-        </div>
-
-        <!-- ATM -->
-        {% elif method == 'atm' %}
-        <div class="glass-strong pay-panel">
-          <div class="info-line"><span>銀行代碼</span><b>013（模擬）</b></div>
-          <div class="info-line"><span>虛擬帳號</span><span class="big-code">{{ payment.virtual_account }}</span></div>
-          <div class="info-line"><span>應付金額</span><b>NT$ {{ order.final_price }}</b></div>
-          <div class="info-line"><span>繳費期限</span><b>{{ payment.expire_at|date:"Y-m-d H:i" }}</b></div>
-          <div class="hint">請於期限內以網銀／ATM 轉帳至上方虛擬帳號。完成後按下方按鈕（模擬銀行入帳回拋）。</div>
-          <form method="post" style="margin-top:14px;">
-            <input type="hidden" name="action" value="confirm_offline" />
-            <input type="hidden" name="method" value="atm" />
-            <button type="submit" class="glass-btn" style="width:100%;">我已完成轉帳（模擬入帳）</button>
-          </form>
-        </div>
-
-        <!-- 超商 -->
-        {% elif method == 'cvs' %}
-        <div class="glass-strong pay-panel">
-          <div class="info-line"><span>超商繳費代碼</span><span class="big-code">{{ payment.payment_code }}</span></div>
-          <div class="info-line"><span>應付金額</span><b>NT$ {{ order.final_price }}</b></div>
-          <div class="info-line"><span>繳費期限</span><b>{{ payment.expire_at|date:"Y-m-d H:i" }}</b></div>
-          <div class="hint">請持繳費代碼至四大超商（7-11／全家／萊爾富／OK）多媒體機台列印繳費單付款。完成後按下方按鈕（模擬超商回拋）。</div>
-          <form method="post" style="margin-top:14px;">
-            <input type="hidden" name="action" value="confirm_offline" />
-            <input type="hidden" name="method" value="cvs" />
-            <button type="submit" class="glass-btn" style="width:100%;">我已完成繳費（模擬）</button>
-          </form>
-        </div>
-        {% else %}
-        <p class="hint" style="margin-top:16px;">請選擇上方任一付款方式繼續。付款完成後才會開通課程。</p>
-        {% endif %}
-      </div>
-
-      <a href="{% url 'home' %}" class="back">← 稍後再付款（訂單保留於待付款）</a>
+{% block content %}
+<main class="max-w-2xl mx-auto px-4 py-10">
+  <!-- 訂單摘要 -->
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7 mb-6">
+    <span class="inline-block bg-amber-100 text-amber-700 font-bold text-xs px-3 py-1 rounded-full mb-3">🧪 模擬金流（未串接真實金流）</span>
+    <h1 class="text-2xl font-black text-slate-900 mb-4">訂單付款</h1>
+    <div class="divide-y divide-slate-100">
+      {% for item in items %}
+      <div class="flex justify-between py-2.5 text-slate-700"><span>{{ item.course.title }}</span><span>NT$ {{ item.price }}</span></div>
+      {% endfor %}
+      <div class="flex justify-between py-2.5 text-slate-500"><span>折扣</span><span>− NT$ {{ order.discount_amount }}</span></div>
+      <div class="flex justify-between py-3 text-xl font-black text-brand-700"><span>應付金額</span><span>NT$ {{ order.final_price }}</span></div>
     </div>
-  </body>
-</html>
+  </div>
+
+  <!-- 付款方式 -->
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7">
+    <h2 class="text-lg font-black text-slate-900 mb-4">選擇付款方式</h2>
+    <div class="grid grid-cols-3 gap-3">
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="select"><input type="hidden" name="method" value="credit_card">
+        <button type="submit" class="w-full py-5 px-2 rounded-2xl border font-bold text-sm transition {% if method == 'credit_card' %}border-brand-600 bg-brand-50 text-brand-700{% else %}border-slate-200 bg-white text-slate-600 hover:border-brand-300{% endif %}"><span class="block text-3xl mb-2">💳</span>信用卡</button>
+      </form>
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="select"><input type="hidden" name="method" value="atm">
+        <button type="submit" class="w-full py-5 px-2 rounded-2xl border font-bold text-sm transition {% if method == 'atm' %}border-brand-600 bg-brand-50 text-brand-700{% else %}border-slate-200 bg-white text-slate-600 hover:border-brand-300{% endif %}"><span class="block text-3xl mb-2">🏧</span>ATM 轉帳</button>
+      </form>
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="select"><input type="hidden" name="method" value="cvs">
+        <button type="submit" class="w-full py-5 px-2 rounded-2xl border font-bold text-sm transition {% if method == 'cvs' %}border-brand-600 bg-brand-50 text-brand-700{% else %}border-slate-200 bg-white text-slate-600 hover:border-brand-300{% endif %}"><span class="block text-3xl mb-2">🏪</span>超商代碼</button>
+      </form>
+    </div>
+
+    {% if error %}<div class="bg-red-50 text-red-600 font-bold px-4 py-3 rounded-lg mt-4">{{ error }}</div>{% endif %}
+
+    {% if method == 'credit_card' %}
+    <div class="bg-slate-50 rounded-2xl p-5 mt-5">
+      <form method="post" class="ef-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="pay_card"><input type="hidden" name="method" value="credit_card">
+        <label>持卡人姓名</label>
+        <input type="text" name="card_name" placeholder="WANG XIAO MING" required>
+        <label>卡號</label>
+        <input type="text" name="card_number" inputmode="numeric" placeholder="4242 4242 4242 4242" required>
+        <div class="flex gap-3">
+          <div class="flex-1"><label>有效期限</label><input type="text" name="card_expiry" placeholder="MM/YY" required></div>
+          <div class="flex-1"><label>安全碼 CVC</label><input type="text" name="card_cvc" inputmode="numeric" placeholder="123" required></div>
+        </div>
+        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-lg transition mt-4">確認付款 NT$ {{ order.final_price }}</button>
+        <p class="text-slate-400 text-xs mt-2 leading-relaxed">🧪 測試卡：<b>4242 4242 4242 4242</b> 付款成功；卡號結尾 <b>0000</b> 模擬失敗。此為模擬，不會儲存卡號。</p>
+      </form>
+    </div>
+
+    {% elif method == 'atm' %}
+    <div class="bg-slate-50 rounded-2xl p-5 mt-5">
+      <div class="flex justify-between py-2.5 border-b border-dashed border-slate-200"><span>銀行代碼</span><b>013（模擬）</b></div>
+      <div class="flex justify-between py-2.5 border-b border-dashed border-slate-200"><span>虛擬帳號</span><span class="text-xl font-black text-brand-700 tracking-widest">{{ payment.virtual_account }}</span></div>
+      <div class="flex justify-between py-2.5 border-b border-dashed border-slate-200"><span>應付金額</span><b>NT$ {{ order.final_price }}</b></div>
+      <div class="flex justify-between py-2.5"><span>繳費期限</span><b>{{ payment.expire_at|date:"Y-m-d H:i" }}</b></div>
+      <p class="text-slate-400 text-sm mt-2">請於期限內以網銀／ATM 轉帳至上方虛擬帳號。完成後按下方按鈕（模擬銀行入帳回拋）。</p>
+      <form method="post" class="mt-4">{% csrf_token %}<input type="hidden" name="action" value="confirm_offline"><input type="hidden" name="method" value="atm">
+        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-lg transition">我已完成轉帳（模擬入帳）</button>
+      </form>
+    </div>
+
+    {% elif method == 'cvs' %}
+    <div class="bg-slate-50 rounded-2xl p-5 mt-5">
+      <div class="flex justify-between py-2.5 border-b border-dashed border-slate-200"><span>超商繳費代碼</span><span class="text-xl font-black text-brand-700 tracking-widest">{{ payment.payment_code }}</span></div>
+      <div class="flex justify-between py-2.5 border-b border-dashed border-slate-200"><span>應付金額</span><b>NT$ {{ order.final_price }}</b></div>
+      <div class="flex justify-between py-2.5"><span>繳費期限</span><b>{{ payment.expire_at|date:"Y-m-d H:i" }}</b></div>
+      <p class="text-slate-400 text-sm mt-2">請持繳費代碼至四大超商多媒體機台列印繳費單付款。完成後按下方按鈕（模擬超商回拋）。</p>
+      <form method="post" class="mt-4">{% csrf_token %}<input type="hidden" name="action" value="confirm_offline"><input type="hidden" name="method" value="cvs">
+        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-lg transition">我已完成繳費（模擬）</button>
+      </form>
+    </div>
+    {% else %}
+    <p class="text-slate-400 text-sm mt-4">請選擇上方任一付款方式繼續。付款完成後才會開通課程。</p>
+    {% endif %}
+  </div>
+
+  <a href="{% url 'home' %}" class="inline-block mt-5 text-brand-600 hover:underline font-medium">← 稍後再付款（訂單保留於待付款）</a>
+</main>
+{% endblock %}

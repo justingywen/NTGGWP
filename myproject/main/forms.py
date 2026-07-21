@@ -9,6 +9,7 @@ from .models import (
     CourseLesson,
     CourseQuestion,
     CourseAnswer,
+    Profile,
 )
 
 
@@ -198,3 +199,38 @@ class ReviewForm(forms.ModelForm):
                 'placeholder': '請輸入你對這門課的想法'
             }),
         }
+
+
+class ProfileEditForm(forms.ModelForm):
+    first_name = forms.CharField(label='名字', max_length=150, required=False)
+    last_name = forms.CharField(label='姓氏', max_length=150, required=False)
+    email = forms.EmailField(label='Email')
+
+    class Meta:
+        model = Profile
+        fields = ['avatar']
+        labels = {'avatar': '大頭貼'}
+        widgets = {'avatar': forms.ClearableFileInput(attrs={'accept': 'image/*'})}
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user')
+        super().__init__(*args, **kwargs)
+        self.fields['first_name'].initial = self.user.first_name
+        self.fields['last_name'].initial = self.user.last_name
+        self.fields['email'].initial = self.user.email
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if User.objects.filter(email=email).exclude(pk=self.user.pk).exists():
+            raise forms.ValidationError('這個 Email 已經被其他帳號使用。')
+        return email
+
+    def save(self, commit=True):
+        profile = super().save(commit=False)
+        self.user.first_name = self.cleaned_data['first_name']
+        self.user.last_name = self.cleaned_data['last_name']
+        self.user.email = self.cleaned_data['email']
+        if commit:
+            self.user.save()
+            profile.save()
+        return profile

@@ -47,6 +47,7 @@ from .forms import (
     LessonForm,
     QuestionForm,
     AnswerForm,
+    ProfileEditForm,
 )
 
 from .payments import gateway
@@ -332,6 +333,27 @@ def profile_view(request):
         'profile': profile,
         'total_minutes': total_minutes,
         'purchased_count': purchased_count,
+    })
+
+
+@login_required
+def edit_profile(request):
+    try:
+        profile = request.user.profile
+    except Profile.DoesNotExist:
+        return redirect('home')
+
+    if request.method == 'POST':
+        form = ProfileEditForm(request.POST, request.FILES, instance=profile, user=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('profile')
+    else:
+        form = ProfileEditForm(instance=profile, user=request.user)
+
+    return render(request, 'main/edit_profile.html', {
+        'form': form,
+        'profile': profile,
     })
 
 
@@ -969,7 +991,122 @@ def export_data_page(request):
     if not request.user.is_superuser:
         return redirect('home')
 
-    return render(request, 'main/export_data.html')
+    export_groups = [
+        ('核心資料', [
+            ('課程資料 courses.csv', '課程名稱、講師、分類、難度、價格與建立時間。', reverse('export_courses_csv')),
+            ('購課紀錄 enrollments.csv', '學生購買課程紀錄，可分析課程銷售與購買趨勢。', reverse('export_enrollments_csv')),
+            ('學習紀錄 learning_records.csv', '觀看分鐘數與觀看時間，可分析學習時數。', reverse('export_learning_records_csv')),
+            ('使用者角色 profiles.csv', '使用者帳號、Email 與角色。', reverse('export_profiles_csv')),
+        ]),
+        ('交易與營收資料', [
+            ('訂單資料 orders.csv', '原價、折扣、實付金額與訂單狀態。', reverse('export_orders_csv')),
+            ('訂單明細 order_items.csv', '每筆訂單購買的課程明細。', reverse('export_order_items_csv')),
+            ('付款紀錄 payments.csv', '付款方式、付款金額、付款狀態與交易編號。', reverse('export_payments_csv')),
+            ('優惠券使用 coupon_usage.csv', '優惠碼、使用者、訂單與折扣金額。', reverse('export_coupon_usage_csv')),
+        ]),
+        ('課程內容與評價資料', [
+            ('課程評價 reviews.csv', '學生評分與評論內容，可分析課程滿意度。', reverse('export_reviews_csv')),
+            ('課程單元 course_lessons.csv', '課程章節、單元、影片分鐘數與免費試看狀態。', reverse('export_course_lessons_csv')),
+        ]),
+    ]
+
+    return render(request, 'main/export_data.html', {
+        'export_groups': export_groups,
+    })
+
+
+@login_required
+def platform_analytics(request):
+    if not request.user.is_superuser:
+        return redirect('home')
+
+    from django.db.models.functions import TruncDate
+
+    paid_orders = Order.objects.filter(status='paid')
+    total_revenue = paid_orders.aggregate(s=Sum('final_price'))['s'] or 0
+    total_students = Enrollment.objects.values('student').distinct().count()
+    published_courses = Course.objects.filter(is_published=True).count()
+    total_courses = Course.objects.count()
+    avg_rating = Review.objects.aggregate(a=Avg('rating'))['a']
+    avg_rating = round(avg_rating, 1) if avg_rating else None
+    pending_refunds = Refund.objects.filter(status='pending').count()
+    pending_audits = CourseAudit.objects.filter(status='pending').count()
+    total_discount = CouponUsage.objects.aggregate(s=Sum('discount_amount'))['s'] or 0
+
+    # 近 30 天營收趨勢
+    since = timezone.now() - timezone.timedelta(days=29)
+    daily = (
+        paid_orders.filter(created_at__gte=since)
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(revenue=Sum('final_price'))
+        .order_by('day')
+    )
+    daily_map = {d['day']: d['revenue'] for d in daily}
+    revenue_labels = []
+    revenue_series = []
+    for i in range(30):
+        day = (since + timezone.timedelta(days=i)).date()
+        revenue_labels.append(day.strftime('%m/%d'))
+        revenue_series.append(daily_map.get(day, 0))
+
+    # 熱銷課程 Top 5（依訂單明細原價加總，涵蓋單課與購物車多課訂單）
+    top_courses = (
+        OrderItem.objects.filter(order__status='paid')
+        .values('course__title')
+        .annotate(gross=Sum('price'), purchases=Count('id'))
+        .order_by('-gross')[:5]
+    )
+    top_course_labels = [t['course__title'] or '（課程已刪除）' for t in top_courses]
+    top_course_revenue = [t['gross'] for t in top_courses]
+
+    # 課程分類分布
+    cat_dist = (
+        Course.objects.filter(is_published=True)
+        .values('category__name')
+        .annotate(n=Count('id'))
+        .order_by('-n')
+    )
+    cat_labels = [c['category__name'] or '未分類' for c in cat_dist]
+    cat_counts = [c['n'] for c in cat_dist]
+
+    # 付款方式分布
+    method_dist = (
+        Payment.objects.filter(status='paid')
+        .values('method')
+        .annotate(n=Count('id'))
+        .order_by('-n')
+    )
+    method_display = dict(Payment.PAYMENT_METHOD_CHOICES)
+    method_labels = [method_display.get(m['method'], m['method']) for m in method_dist]
+    method_counts = [m['n'] for m in method_dist]
+
+    # 訂單狀態分布
+    status_dist = Order.objects.values('status').annotate(n=Count('id')).order_by('-n')
+    status_display = dict(Order.STATUS_CHOICES)
+    status_labels = [status_display.get(s['status'], s['status']) for s in status_dist]
+    status_counts = [s['n'] for s in status_dist]
+
+    return render(request, 'main/platform_analytics.html', {
+        'total_revenue': total_revenue,
+        'total_students': total_students,
+        'published_courses': published_courses,
+        'total_courses': total_courses,
+        'avg_rating': avg_rating,
+        'pending_refunds': pending_refunds,
+        'pending_audits': pending_audits,
+        'total_discount': total_discount,
+        'revenue_labels_json': json.dumps(revenue_labels),
+        'revenue_series_json': json.dumps(revenue_series),
+        'top_course_labels_json': json.dumps(top_course_labels, ensure_ascii=False),
+        'top_course_revenue_json': json.dumps(top_course_revenue),
+        'cat_labels_json': json.dumps(cat_labels, ensure_ascii=False),
+        'cat_counts_json': json.dumps(cat_counts),
+        'method_labels_json': json.dumps(method_labels, ensure_ascii=False),
+        'method_counts_json': json.dumps(method_counts),
+        'status_labels_json': json.dumps(status_labels, ensure_ascii=False),
+        'status_counts_json': json.dumps(status_counts),
+    })
 
 
 def create_csv_response(filename):

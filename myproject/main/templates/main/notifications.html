@@ -1,47 +1,29 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>通知中心</title>
-    {% include 'main/partials/glass_head.html' %}
-    <style>
-      .container { max-width: 760px; margin: 40px auto; padding: 0 20px; }
-      .card { padding: 28px; }
-      .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-      h1 { margin: 0; font-size: 26px; font-weight: 800; }
-      .note { border-left: 4px solid rgba(148,163,184,0.5); padding: 14px 16px; margin-top: 14px; border-radius: 10px; background: rgba(255,255,255,0.4); }
-      .note.unread { border-left-color: var(--brand); background: rgba(79,70,229,0.08); }
-      .n-title { font-weight: 800; }
-      .n-content { color: #334155; margin-top: 4px; }
-      .n-time { color: #94a3b8; font-size: 13px; margin-top: 6px; }
-      .dot { display: inline-block; width: 8px; height: 8px; background: var(--brand); border-radius: 50%; margin-right: 6px; }
-      .empty { color: var(--ink-soft); margin-top: 16px; }
-    </style>
-  </head>
-  <body>
-    {% include 'main/partials/navbar.html' %}
-    <div class="container">
-      <div class="glass card">
-        <div class="head">
-          <h1>通知中心</h1>
-          <form method="post" action="{% url 'mark_notifications_read' %}">
-            {% csrf_token %}
-            <button type="submit" class="glass-btn">全部標為已讀</button>
-          </form>
-        </div>
-        {% if notifications %}
-          {% for n in notifications %}
-          <div class="note {% if not n.is_read %}unread{% endif %}">
-            <div class="n-title">{% if not n.is_read %}<span class="dot"></span>{% endif %}{{ n.title }}</div>
-            <div class="n-content">{{ n.content }}</div>
-            <div class="n-time">{{ n.created_at|date:"Y-m-d H:i" }}</div>
-          </div>
-          {% endfor %}
-        {% else %}
-        <p class="empty">目前沒有任何通知。</p>
-        {% endif %}
-      </div>
+{% extends 'main/base_eduflow.html' %}
+{% block title %}通知中心 | EduFlow{% endblock %}
+
+{% block content %}
+<main class="max-w-3xl mx-auto px-4 py-10">
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7">
+    <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
+      <h1 class="text-2xl font-black text-slate-900">通知中心</h1>
+      <form method="post" action="{% url 'mark_notifications_read' %}">
+        {% csrf_token %}
+        <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition">全部標為已讀</button>
+      </form>
     </div>
-  </body>
-</html>
+    {% if notifications %}
+    <div class="space-y-3">
+      {% for n in notifications %}
+      <div class="rounded-xl px-4 py-3.5 border-l-4 {% if n.is_read %}border-slate-200 bg-slate-50{% else %}border-brand-500 bg-brand-50{% endif %}">
+        <div class="font-bold text-slate-800">{% if not n.is_read %}<span class="inline-block w-2 h-2 bg-brand-500 rounded-full mr-1.5"></span>{% endif %}{{ n.title }}</div>
+        <div class="text-slate-600 mt-1">{{ n.content }}</div>
+        <div class="text-xs text-slate-400 mt-1.5">{{ n.created_at|date:"Y-m-d H:i" }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-slate-500 mt-4">目前沒有任何通知。</p>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}

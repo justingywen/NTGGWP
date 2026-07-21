@@ -1,49 +1,31 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>學生首頁</title>
-    {% include 'main/partials/glass_head.html' %}
-    <style>
-      .container { max-width: 1040px; margin: 40px auto; padding: 0 20px; }
-      .card { padding: 32px; }
-      h1 { margin: 0 0 8px; font-size: 28px; font-weight: 800; }
-      .desc { color: var(--ink-soft); line-height: 1.8; margin: 0 0 24px; }
-      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
-      .box { padding: 22px; }
-      .box h3 { margin: 0 0 8px; font-size: 17px; }
-      .box p { color: var(--ink-soft); font-size: 14px; line-height: 1.6; margin: 0 0 12px; }
-      .number { font-size: 30px; font-weight: 800; color: #4338ca; }
-    </style>
-  </head>
-  <body>
-    {% include 'main/partials/navbar.html' %}
-    <div class="container">
-      <div class="glass card">
-        <h1>學生首頁</h1>
-        <p class="desc">歡迎，{{ request.user.username }}。在這裡查看我的課程、學習紀錄與學習分析。</p>
-        <div class="grid">
-          <div class="glass-strong box">
-            <h3>我的課程</h3>
-            <p>查看已購買課程與正在學習的內容。</p>
-            <a href="{% url 'my_courses' %}" class="glass-btn">前往</a>
-          </div>
-          <div class="glass-strong box">
-            <h3>已購課程數</h3>
-            <div class="number">{{ purchased_count }}</div>
-          </div>
-          <div class="glass-strong box">
-            <h3>累積學習分鐘</h3>
-            <div class="number">{{ total_minutes }}</div>
-          </div>
-          <div class="glass-strong box">
-            <h3>學習分析圖表</h3>
-            <p>觀看時數、課程比例與最近紀錄。</p>
-            <a href="{% url 'student_analytics' %}" class="glass-btn">查看圖表</a>
-          </div>
-        </div>
+{% extends 'main/base_eduflow.html' %}
+{% block title %}學生專區 | EduFlow{% endblock %}
+
+{% block content %}
+<main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8">
+    <h1 class="text-2xl font-black text-slate-900 mb-1">學生專區</h1>
+    <p class="text-slate-500 mb-6">歡迎，{{ request.user.username }}。在這裡查看我的課程、學習紀錄與學習分析。</p>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-brand-50 rounded-xl p-5">
+        <h3 class="font-bold text-slate-800 mb-1">我的課程</h3>
+        <p class="text-sm text-slate-500 mb-3">查看已購課程與學習進度。</p>
+        <a href="{% url 'my_courses' %}" class="inline-block bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition">前往</a>
+      </div>
+      <div class="bg-slate-50 rounded-xl p-5">
+        <h3 class="font-bold text-slate-800 mb-2">已購課程數</h3>
+        <div class="text-3xl font-black text-brand-700">{{ purchased_count }}</div>
+      </div>
+      <div class="bg-slate-50 rounded-xl p-5">
+        <h3 class="font-bold text-slate-800 mb-2">累積學習分鐘</h3>
+        <div class="text-3xl font-black text-brand-700">{{ total_minutes }}</div>
+      </div>
+      <div class="bg-brand-50 rounded-xl p-5">
+        <h3 class="font-bold text-slate-800 mb-1">學習分析</h3>
+        <p class="text-sm text-slate-500 mb-3">觀看時數、課程比例與紀錄。</p>
+        <a href="{% url 'student_analytics' %}" class="inline-block bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition">查看圖表</a>
       </div>
     </div>
-  </body>
-</html>
+  </div>
+</main>
+{% endblock %}

@@ -1,71 +1,47 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>老師首頁</title>
-    {% include 'main/partials/glass_head.html' %}
-    <style>
-      .container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
-      .card { padding: 32px; margin-bottom: 22px; }
-      h1 { margin: 0 0 8px; font-size: 28px; font-weight: 800; }
-      .desc { color: var(--ink-soft); line-height: 1.8; margin: 0 0 18px; }
-      .course-list { display: grid; gap: 18px; }
-      .course-item { padding: 22px; }
-      .ci-title { font-size: 20px; font-weight: 800; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-      .badge { font-size: 13px; padding: 3px 12px; border-radius: 999px; font-weight: 700; }
-      .b-on { background: rgba(22,163,74,0.15); color: #166534; }
-      .b-off { background: rgba(245,158,11,0.18); color: #92400e; }
-      .metrics { display: flex; gap: 22px; flex-wrap: wrap; color: var(--ink-soft); margin-bottom: 14px; }
-      .metrics b { color: var(--ink); }
-      .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-      .actions .glass-btn { font-size: 14px; padding: 9px 15px; }
-      .empty-box { padding: 34px; text-align: center; color: var(--ink-soft); line-height: 1.9; }
-    </style>
-  </head>
-  <body>
-    {% include 'main/partials/navbar.html' %}
-    <div class="container">
-      <div class="glass card">
-        <h1>老師首頁</h1>
-        <p class="desc">歡迎，{{ request.user.username }}。管理你的課程、內容與銷售數據。</p>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <a href="{% url 'create_course' %}" class="glass-btn">＋ 新增課程</a>
-          <a href="{% url 'teacher_analytics' %}" class="glass-btn ghost">課程分析圖表</a>
-        </div>
-      </div>
+{% extends 'main/base_eduflow.html' %}
+{% block title %}教師專區 | EduFlow{% endblock %}
 
-      {% if course_data %}
-      <div class="course-list">
-        {% for item in course_data %}
-        <div class="glass course-item">
-          <div class="ci-title">
-            {{ item.course.title }}
-            {% if item.course.is_published %}
-            <span class="badge b-on">已上架</span>
-            {% else %}
-            <span class="badge b-off">審核中／未上架</span>
-            {% endif %}
-          </div>
-          <div class="metrics">
-            <div>價格 <b>NT$ {{ item.course.price }}</b></div>
-            <div>購買 <b>{{ item.purchase_count }}</b> 人</div>
-            <div>觀看 <b>{{ item.total_watch_minutes }}</b> 分</div>
-            {% if item.average_rating %}<div>評分 <b>★ {{ item.average_rating }}</b></div>{% endif %}
-          </div>
-          <div class="actions">
-            <a href="{% url 'manage_content' item.course.id %}" class="glass-btn">內容管理</a>
-            <a href="{% url 'edit_course' item.course.id %}" class="glass-btn ghost">編輯課程</a>
-            <a href="{% url 'delete_course' item.course.id %}" class="glass-btn danger">刪除</a>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="glass empty-box">
-        你目前還沒有建立任何課程。<br />點上方「＋ 新增課程」建立你的第一門課。
-      </div>
-      {% endif %}
+{% block content %}
+<main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8 mb-6">
+    <h1 class="text-2xl font-black text-slate-900 mb-1">教師專區</h1>
+    <p class="text-slate-500 mb-5">歡迎，{{ request.user.username }}。管理你的課程、內容與銷售數據。</p>
+    <div class="flex gap-3 flex-wrap">
+      <a href="{% url 'create_course' %}" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-5 py-2.5 rounded-lg transition">＋ 新增課程</a>
+      <a href="{% url 'teacher_analytics' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">課程分析圖表</a>
     </div>
-  </body>
-</html>
+  </div>
+
+  {% if course_data %}
+  <div class="space-y-5">
+    {% for item in course_data %}
+    <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-6">
+      <div class="flex items-center gap-3 flex-wrap mb-3">
+        <h3 class="text-xl font-black text-slate-900">{{ item.course.title }}</h3>
+        {% if item.course.is_published %}
+        <span class="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full">已上架</span>
+        {% else %}
+        <span class="bg-amber-100 text-amber-700 text-xs font-bold px-3 py-1 rounded-full">審核中／未上架</span>
+        {% endif %}
+      </div>
+      <div class="flex gap-6 flex-wrap text-slate-500 mb-4">
+        <div>價格 <b class="text-slate-800">NT$ {{ item.course.price }}</b></div>
+        <div>購買 <b class="text-slate-800">{{ item.purchase_count }}</b> 人</div>
+        <div>觀看 <b class="text-slate-800">{{ item.total_watch_minutes }}</b> 分</div>
+        {% if item.average_rating %}<div>評分 <b class="text-amber-500">★ {{ item.average_rating }}</b></div>{% endif %}
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <a href="{% url 'manage_content' item.course.id %}" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition">內容管理</a>
+        <a href="{% url 'edit_course' item.course.id %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-sm transition">編輯課程</a>
+        <a href="{% url 'delete_course' item.course.id %}" class="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-4 py-2 rounded-lg text-sm transition">刪除</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-12 text-center text-slate-500">
+    你目前還沒有建立任何課程。<br>點上方「＋ 新增課程」建立你的第一門課。
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

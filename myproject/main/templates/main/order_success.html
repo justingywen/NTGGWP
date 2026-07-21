@@ -1,45 +1,32 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>訂單完成</title>
-    {% include 'main/partials/glass_head.html' %}
-    <style>
-      .container { max-width: 640px; margin: 60px auto; padding: 0 20px; }
-      .card { padding: 40px; text-align: center; }
-      .icon { font-size: 56px; }
-      h1 { margin: 10px 0 18px; font-size: 28px; font-weight: 800; color: #16a34a; }
-      .row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.5); font-size: 16px; text-align: left; }
-      .row.final { font-size: 20px; font-weight: 800; color: #4338ca; border-bottom: none; }
-      .btn-row { margin-top: 24px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-    </style>
-  </head>
-  <body>
-    {% include 'main/partials/navbar.html' %}
-    <div class="container">
-      <div class="glass card">
-        <div class="icon">🎉</div>
-        <h1>付款完成，購買成功</h1>
+{% extends 'main/base_eduflow.html' %}
+{% block title %}訂單完成 | EduFlow{% endblock %}
 
-        {% for item in items %}
-        <div class="row"><span>{{ item.course.title }}</span><span>NT$ {{ item.price }}</span></div>
-        {% endfor %}
+{% block content %}
+<main class="max-w-lg mx-auto px-4 py-14">
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8 text-center">
+    <div class="text-5xl mb-3">🎉</div>
+    <h1 class="text-2xl font-black text-green-600 mb-6">付款完成，購買成功</h1>
 
-        <div class="row"><span>原價</span><span>NT$ {{ order.original_price }}</span></div>
-        <div class="row"><span>折扣</span><span>− NT$ {{ order.discount_amount }}</span></div>
-        {% if order.coupon %}<div class="row"><span>使用優惠券</span><span>{{ order.coupon.code }}</span></div>{% endif %}
-        {% if payment %}<div class="row"><span>付款方式</span><span>{{ payment.get_method_display }}</span></div>
-        <div class="row"><span>交易編號</span><span>{{ payment.transaction_no }}</span></div>{% endif %}
-        <div class="row final"><span>實付金額</span><span>NT$ {{ order.final_price }}</span></div>
-
-        <div class="btn-row">
-          {% if order.course %}
-          <a href="{% url 'watch_course' order.course.id %}" class="glass-btn" style="background:linear-gradient(135deg,#16a34a,#15803d);">▶ 立即開始上課</a>
-          {% endif %}
-          <a href="{% url 'my_courses' %}" class="glass-btn ghost">我的課程</a>
-        </div>
-      </div>
+    <div class="text-left divide-y divide-slate-100 mb-2">
+      {% for item in items %}
+      <div class="flex justify-between py-2.5 text-slate-700"><span>{{ item.course.title }}</span><span>NT$ {{ item.price }}</span></div>
+      {% endfor %}
+      <div class="flex justify-between py-2.5 text-slate-500"><span>原價</span><span>NT$ {{ order.original_price }}</span></div>
+      <div class="flex justify-between py-2.5 text-slate-500"><span>折扣</span><span>− NT$ {{ order.discount_amount }}</span></div>
+      {% if order.coupon %}<div class="flex justify-between py-2.5 text-slate-500"><span>使用優惠券</span><span>{{ order.coupon.code }}</span></div>{% endif %}
+      {% if payment %}
+      <div class="flex justify-between py-2.5 text-slate-500"><span>付款方式</span><span>{{ payment.get_method_display }}</span></div>
+      <div class="flex justify-between py-2.5 text-slate-500"><span>交易編號</span><span class="text-sm">{{ payment.transaction_no }}</span></div>
+      {% endif %}
+      <div class="flex justify-between py-2.5 text-lg font-black text-brand-700"><span>實付金額</span><span>NT$ {{ order.final_price }}</span></div>
     </div>
-  </body>
-</html>
+
+    <div class="flex gap-3 justify-center flex-wrap mt-6">
+      {% if order.course %}
+      <a href="{% url 'watch_course' order.course.id %}" class="bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-lg transition">▶ 立即開始上課</a>
+      {% endif %}
+      <a href="{% url 'my_courses' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-6 py-3 rounded-lg transition">我的課程</a>
+    </div>
+  </div>
+</main>
+{% endblock %}

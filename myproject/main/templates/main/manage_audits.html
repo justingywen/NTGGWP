@@ -1,58 +1,37 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>課程審核</title>
-    {% include 'main/partials/glass_head.html' %}
-    <style>
-      .container { max-width: 980px; margin: 40px auto; padding: 0 20px; }
-      .card { padding: 26px; }
-      h1 { margin: 0 0 12px; font-size: 26px; font-weight: 800; }
-      .row { padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.5); }
-      .row:last-child { border-bottom: none; }
-      .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-      .t { font-weight: 800; }
-      .meta { color: var(--ink-soft); font-size: 14px; }
-      .badge { padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
-      .b-pending { background: rgba(245,158,11,0.18); color: #92400e; }
-      .b-approved { background: rgba(22,163,74,0.15); color: #166534; }
-      .b-rejected { background: rgba(239,68,68,0.15); color: #991b1b; }
-      .a-form { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-      input[name=comment] { flex: 1; min-width: 180px; padding: 9px; border: 1px solid rgba(255,255,255,0.7); border-radius: 8px; background: rgba(255,255,255,0.65); }
-      .glass-btn.sm { padding: 8px 14px; font-size: 14px; }
-      .empty { color: var(--ink-soft); }
-    </style>
-  </head>
-  <body>
-    {% include 'main/partials/navbar.html' %}
-    <div class="container">
-      <div class="glass card">
-        <h1>課程審核</h1>
-        {% if audits %}
-          {% for a in audits %}
-          <div class="row">
-            <div class="top">
-              <div>
-                <div class="t">{{ a.course.title }}</div>
-                <div class="meta">講師：{{ a.course.teacher.username }} ・ 送審：{{ a.created_at|date:"Y-m-d H:i" }}{% if a.comment %} ・ 意見：{{ a.comment }}{% endif %}</div>
-              </div>
-              <span class="badge b-{{ a.status }}">{{ a.get_status_display }}</span>
-            </div>
-            {% if a.status == 'pending' %}
-            <form method="post" action="{% url 'process_audit' a.id %}" class="a-form">
-              {% csrf_token %}
-              <input type="text" name="comment" placeholder="審核意見（退回時建議填寫）" />
-              <button type="submit" name="action" value="approve" class="glass-btn sm" style="background:linear-gradient(135deg,#16a34a,#15803d);">通過並上架</button>
-              <button type="submit" name="action" value="reject" class="glass-btn danger sm">退回</button>
-            </form>
-            {% endif %}
+{% extends 'main/base_eduflow.html' %}
+{% block title %}課程審核 | EduFlow{% endblock %}
+
+{% block content %}
+<main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7">
+    <h1 class="text-2xl font-black text-slate-900 mb-5">課程審核</h1>
+    {% if audits %}
+    <div class="divide-y divide-slate-100">
+      {% for a in audits %}
+      <div class="py-4">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div class="font-bold text-slate-800">{{ a.course.title }}</div>
+            <div class="text-sm text-slate-500">講師：{{ a.course.teacher.username }} ・ 送審：{{ a.created_at|date:"Y-m-d H:i" }}{% if a.comment %} ・ 意見：{{ a.comment }}{% endif %}</div>
           </div>
-          {% endfor %}
-        {% else %}
-        <p class="empty">目前沒有待審核的課程。</p>
+          <span class="px-3 py-1 rounded-full text-sm font-bold
+            {% if a.status == 'pending' %}bg-amber-100 text-amber-700
+            {% elif a.status == 'rejected' %}bg-red-50 text-red-600
+            {% else %}bg-green-100 text-green-700{% endif %}">{{ a.get_status_display }}</span>
+        </div>
+        {% if a.status == 'pending' %}
+        <form method="post" action="{% url 'process_audit' a.id %}" class="flex items-center gap-2 flex-wrap mt-3">
+          {% csrf_token %}
+          <input type="text" name="comment" placeholder="審核意見（退回時建議填寫）"
+                 class="flex-1 min-w-[180px] border border-slate-200 rounded-lg py-2 px-3 text-sm outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-200">
+          <button type="submit" name="action" value="approve" class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition">通過並上架</button>
+          <button type="submit" name="action" value="reject" class="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-4 py-2 rounded-lg text-sm transition">退回</button>
+        </form>
         {% endif %}
       </div>
+      {% endfor %}
     </div>
-  </body>
-</html>
+    {% else %}<p class="text-slate-500">目前沒有待審核的課程。</p>{% endif %}
+  </div>
+</main>
+{% endblock %}

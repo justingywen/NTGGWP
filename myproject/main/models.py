@@ -11,6 +11,9 @@ class Profile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="使用者")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, verbose_name="角色")
+    avatar = models.ImageField(
+        upload_to='avatars/', blank=True, null=True, verbose_name="大頭貼"
+    )
 
     def __str__(self):
         return f"{self.user.username} - {self.get_role_display()}"

@@ -1,58 +1,35 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>登入</title>
-    {% include 'main/partials/glass_head.html' %}
-    <style>
-      .container { max-width: 480px; margin: 56px auto; padding: 0 20px; }
-      .auth-card { padding: 34px; }
-      h1 { margin: 0 0 8px; font-size: 30px; font-weight: 800; }
-      .desc { color: var(--ink-soft); margin-bottom: 22px; line-height: 1.7; }
-      .form-group { margin-bottom: 16px; }
-      label { display: block; margin-bottom: 6px; font-weight: 700; }
-      .error { background: rgba(239,68,68,0.12); color: #b91c1c; padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; font-weight: 600; }
-      .quick { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.5); }
-      .quick h3 { font-size: 16px; margin: 0 0 12px; }
-      .fake { display: grid; gap: 10px; }
-      .fake a { text-align: center; padding: 11px; border: 1px solid rgba(255,255,255,0.6); border-radius: 10px; color: var(--ink-soft); background: rgba(255,255,255,0.4); text-decoration: none; }
-      .back { display: inline-block; margin-top: 18px; color: #4338ca; text-decoration: none; font-weight: 600; }
-    </style>
-  </head>
-  <body>
-    {% include 'main/partials/navbar.html' %}
-    <div class="container">
-      <div class="glass auth-card">
-        <h1>登入</h1>
-        <p class="desc">輸入帳號名稱或 Gmail，以及密碼登入平台。</p>
+{% extends 'main/base_eduflow.html' %}
+{% block title %}登入 | EduFlow{% endblock %}
 
-        {% if error_message %}<div class="error">{{ error_message }}</div>{% endif %}
+{% block content %}
+<main class="max-w-md mx-auto px-4 py-14">
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8">
+    <h1 class="text-2xl font-black text-slate-900 mb-1">登入</h1>
+    <p class="text-slate-500 mb-6">輸入帳號名稱或 Gmail 與密碼登入平台。</p>
 
-        <form method="post">
-          {% csrf_token %}
-          <div class="form-group">
-            <label for="username">帳號名稱或 Gmail</label>
-            <input type="text" id="username" name="username" class="glass-input" placeholder="請輸入帳號名稱或 Gmail" required />
-          </div>
-          <div class="form-group">
-            <label for="password">密碼</label>
-            <input type="password" id="password" name="password" class="glass-input" required />
-          </div>
-          <button type="submit" class="glass-btn" style="width:100%;">登入</button>
-          <a href="{% url 'password_reset' %}" class="back">忘記密碼？</a>
-        </form>
+    {% if error_message %}
+    <div class="bg-red-50 text-red-600 font-medium px-4 py-3 rounded-lg mb-5 text-sm">{{ error_message }}</div>
+    {% endif %}
 
-        <div class="quick">
-          <h3>快速登入（預留）</h3>
-          <div class="fake">
-            <a href="#">使用 Google 登入</a>
-            <a href="#">使用 Facebook 登入</a>
-            <a href="#">使用 GitHub 登入</a>
-          </div>
-        </div>
-        <a href="/" class="back">回首頁</a>
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1.5" for="username">帳號名稱或 Gmail</label>
+        <input type="text" id="username" name="username" placeholder="請輸入帳號名稱或 Gmail" required
+               class="w-full border border-slate-200 rounded-lg py-2.5 px-3 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-200 transition">
       </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1.5" for="password">密碼</label>
+        <input type="password" id="password" name="password" required
+               class="w-full border border-slate-200 rounded-lg py-2.5 px-3 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-200 transition">
+      </div>
+      <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-lg transition">登入</button>
+    </form>
+
+    <div class="flex items-center justify-between mt-4 text-sm">
+      <a href="{% url 'password_reset' %}" class="text-brand-600 hover:underline">忘記密碼？</a>
+      <a href="{% url 'register' %}" class="text-slate-500 hover:text-brand-600">還沒有帳號？免費註冊</a>
     </div>
-  </body>
-</html>
+  </div>
+</main>
+{% endblock %}

@@ -26,6 +26,7 @@ urlpatterns = [
     path('teacher/analytics/', views.teacher_analytics, name='teacher_analytics'),
 
     path('export-data/', views.export_data_page, name='export_data_page'),
+    path('analytics/', views.platform_analytics, name='platform_analytics'),
     path('export/courses.csv', views.export_courses_csv, name='export_courses_csv'),
     path('export/enrollments.csv', views.export_enrollments_csv, name='export_enrollments_csv'),
     path('export/learning-records.csv', views.export_learning_records_csv, name='export_learning_records_csv'),
@@ -44,6 +45,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
 
     path('profile/', views.profile_view, name='profile'),
+    path('profile/edit/', views.edit_profile, name='edit_profile'),
     path('my-courses/', views.my_courses, name='my_courses'),
 
     path('create-course/', views.create_course, name='create_course'),

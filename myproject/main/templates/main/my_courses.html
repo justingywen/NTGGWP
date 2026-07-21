@@ -1,95 +1,64 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>我的課程</title>
-    {% include 'main/partials/glass_head.html' %}
-    <style>
-      .container { max-width: 1120px; margin: 36px auto; padding: 0 20px; }
-      .head-card { padding: 30px; margin-bottom: 24px; }
-      h1 { margin: 0 0 8px; font-size: 30px; font-weight: 800; }
-      .desc { color: var(--ink-soft); line-height: 1.8; margin: 0 0 18px; }
-      .summary { display: flex; gap: 16px; flex-wrap: wrap; }
-      .stat { flex: 1; min-width: 160px; padding: 18px; border-radius: 16px; text-align: center; }
-      .stat b { display: block; font-size: 26px; color: #4338ca; }
-      .stat span { color: var(--ink-soft); font-size: 14px; }
-      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; }
-      .course-item { overflow: hidden; display: flex; flex-direction: column; }
-      .course-img { width: 100%; height: 160px; object-fit: cover; background: linear-gradient(135deg,#ddd6fe,#fbcfe8); }
-      .ph { width: 100%; height: 160px; display: grid; place-items: center; font-size: 40px; font-weight: 800; color: var(--brand); opacity: .5; background: linear-gradient(135deg,#ddd6fe,#fbcfe8); }
-      .ci-body { padding: 18px; display: flex; flex-direction: column; flex: 1; }
-      .ci-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
-      .ci-teacher { color: var(--ink-soft); font-size: 14px; margin-bottom: 12px; }
-      .progress-wrap { margin: 6px 0 4px; }
-      .progress-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-soft); margin-bottom: 5px; }
-      .bar { height: 9px; border-radius: 999px; background: rgba(148,163,184,0.3); overflow: hidden; }
-      .bar > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg,#4f46e5,#7c3aed); }
-      .ci-actions { margin-top: auto; padding-top: 14px; display: flex; gap: 8px; }
-      .ci-actions .glass-btn { flex: 1; text-align: center; padding: 10px; font-size: 14px; }
-      .empty-box { padding: 40px; text-align: center; color: var(--ink-soft); }
-      .refund-status { margin-top: 8px; text-align: center; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 14px; }
-      .refund-pending { background: rgba(245,158,11,0.18); color: #92400e; }
-      .refund-approved, .refund-completed { background: rgba(22,163,74,0.15); color: #166534; }
-      .refund-rejected { background: rgba(239,68,68,0.15); color: #991b1b; }
-    </style>
-  </head>
-  <body>
-    {% include 'main/partials/navbar.html' %}
+{% extends 'main/base_eduflow.html' %}
+{% block title %}我的課程 | EduFlow{% endblock %}
 
-    <div class="container">
-      <div class="glass head-card">
-        <h1>我的課程</h1>
-        <p class="desc">歡迎，{{ request.user.username }}。這裡顯示你已購買的課程與學習進度。</p>
-        <div class="summary">
-          <div class="glass-strong stat"><b>{{ enrollments|length }}</b><span>已購課程</span></div>
-          <div class="glass-strong stat"><b>{{ total_minutes }}</b><span>累積學習分鐘</span></div>
-        </div>
+{% block content %}
+<main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7 mb-6">
+    <h1 class="text-2xl font-black text-slate-900 mb-1">我的課程</h1>
+    <p class="text-slate-500 mb-5">歡迎，{{ request.user.username }}。這裡顯示你已購買的課程與學習進度。</p>
+    <div class="flex gap-4 flex-wrap">
+      <div class="flex-1 min-w-[150px] bg-brand-50 rounded-xl p-4 text-center">
+        <div class="text-2xl font-black text-brand-700">{{ enrollments|length }}</div><div class="text-sm text-slate-500">已購課程</div>
       </div>
-
-      {% if enrollments %}
-      <div class="grid">
-        {% for enrollment in enrollments %}
-        <div class="glass course-item">
-          {% if enrollment.course.image %}
-          <img src="{{ enrollment.course.image.url }}" alt="{{ enrollment.course.title }}" class="course-img" />
-          {% else %}
-          <div class="ph">{{ enrollment.course.title|slice:":1" }}</div>
-          {% endif %}
-          <div class="ci-body">
-            <div class="ci-title">{{ enrollment.course.title }}</div>
-            <div class="ci-teacher">講師：{{ enrollment.course.teacher.username }}</div>
-
-            <div class="progress-wrap">
-              <div class="progress-label">
-                <span>學習進度</span>
-                <span>{{ enrollment.progress }}%（{{ enrollment.watch_minutes }}/{{ enrollment.course_total_minutes }} 分）</span>
-              </div>
-              <div class="bar"><i style="width: {{ enrollment.progress }}%;"></i></div>
-            </div>
-
-            <div class="ci-actions">
-              <a href="{% url 'course_detail' enrollment.course.id %}" class="glass-btn ghost">課程頁</a>
-              <a href="{% url 'watch_course' enrollment.course.id %}" class="glass-btn" style="background:linear-gradient(135deg,#16a34a,#15803d);">▶ 上課</a>
-            </div>
-            {% if enrollment.progress == 100 %}
-            <a href="{% url 'certificate' enrollment.course.id %}" class="glass-btn warn" style="text-align:center; margin-top:8px;">🎓 下載結業證書</a>
-            {% endif %}
-
-            {% if enrollment.refund %}
-            <div class="refund-status refund-{{ enrollment.refund.status }}">退款：{{ enrollment.refund.get_status_display }}</div>
-            {% elif enrollment.order %}
-            <a href="{% url 'request_refund' enrollment.order.id %}" class="glass-btn danger" style="text-align:center; margin-top:8px;">申請退款</a>
-            {% endif %}
-          </div>
-        </div>
-        {% endfor %}
+      <div class="flex-1 min-w-[150px] bg-brand-50 rounded-xl p-4 text-center">
+        <div class="text-2xl font-black text-brand-700">{{ total_minutes }}</div><div class="text-sm text-slate-500">累積學習分鐘</div>
       </div>
-      {% else %}
-      <div class="glass empty-box">
-        你目前還沒有購買任何課程。<br />可以先到首頁瀏覽課程並完成購買。
-      </div>
-      {% endif %}
     </div>
-  </body>
-</html>
+  </div>
+
+  {% if enrollments %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for enrollment in enrollments %}
+    <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm overflow-hidden flex flex-col">
+      <div class="aspect-video bg-slate-200">
+        {% if enrollment.course.image %}<img src="{{ enrollment.course.image.url }}" alt="{{ enrollment.course.title }}" class="w-full h-full object-cover">
+        {% else %}<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand-400 to-violet-400 text-white text-4xl font-black">{{ enrollment.course.title|slice:":1"|upper }}</div>{% endif %}
+      </div>
+      <div class="p-5 flex flex-col flex-1">
+        <h3 class="font-bold text-slate-900 mb-0.5 line-clamp-2">{{ enrollment.course.title }}</h3>
+        <p class="text-sm text-slate-500 mb-3">講師：{{ enrollment.course.teacher.username }}</p>
+
+        <div class="flex justify-between text-xs text-slate-500 mb-1.5">
+          <span>學習進度</span>
+          <span>{{ enrollment.progress }}%（{{ enrollment.watch_minutes }}/{{ enrollment.course_total_minutes }} 分）</span>
+        </div>
+        <div class="h-2 bg-slate-100 rounded-full overflow-hidden mb-4"><div class="h-full bg-gradient-to-r from-brand-600 to-violet-500 rounded-full" style="width: {{ enrollment.progress }}%;"></div></div>
+
+        <div class="flex gap-2 mt-auto">
+          <a href="{% url 'course_detail' enrollment.course.id %}" class="flex-1 text-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-lg text-sm transition">課程頁</a>
+          <a href="{% url 'watch_course' enrollment.course.id %}" class="flex-1 text-center bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 rounded-lg text-sm transition">▶ 上課</a>
+        </div>
+
+        {% if enrollment.progress == 100 %}
+        <a href="{% url 'certificate' enrollment.course.id %}" class="mt-2 text-center bg-accent-500 hover:bg-accent-600 text-white font-bold py-2.5 rounded-lg text-sm transition">🎓 下載結業證書</a>
+        {% endif %}
+
+        {% if enrollment.refund %}
+        <div class="mt-2 text-center py-2 rounded-lg text-sm font-bold
+          {% if enrollment.refund.status == 'pending' %}bg-amber-50 text-amber-700
+          {% elif enrollment.refund.status == 'rejected' %}bg-red-50 text-red-600
+          {% else %}bg-green-50 text-green-700{% endif %}">退款：{{ enrollment.refund.get_status_display }}</div>
+        {% elif enrollment.order %}
+        <a href="{% url 'request_refund' enrollment.order.id %}" class="mt-2 text-center bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2.5 rounded-lg text-sm transition">申請退款</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-12 text-center text-slate-500">
+    你目前還沒有購買任何課程。<br>可以先到<a href="{% url 'home' %}#courses" class="text-brand-600 hover:underline">首頁</a>瀏覽課程並完成購買。
+  </div>
+  {% endif %}
+</main>
+{% endblock %}
