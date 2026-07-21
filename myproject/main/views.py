@@ -109,6 +109,15 @@ def home(request):
     )
     latest_courses = _decorate(base_pub.order_by('-created_at')[:10])
 
+    now = timezone.now()
+    funding_courses = list(
+        base_pub.filter(
+            is_crowdfunding=True,
+            funding_start_date__lte=now,
+            funding_end_date__gte=now,
+        ).order_by('funding_end_date')[:10]
+    )
+
     return render(request, 'main/home.html', {
         'page_obj': page_obj,
         'sort': sort,
@@ -120,6 +129,7 @@ def home(request):
         'avg_all': avg_all,
         'popular_courses': popular_courses,
         'latest_courses': latest_courses,
+        'funding_courses': funding_courses,
         'sort_options': [
             ('newest', '最新'),
             ('popular', '熱門'),
@@ -509,7 +519,8 @@ def checkout(request, course_id):
 
     form = CouponApplyForm(request.POST or None)
 
-    original_price = course.price
+    list_price = course.price
+    original_price = course.get_effective_price()
     coupon = None
     discount_amount = 0
     final_price = original_price
@@ -581,6 +592,7 @@ def checkout(request, course_id):
     return render(request, 'main/checkout.html', {
         'course': course,
         'form': form,
+        'list_price': list_price,
         'original_price': original_price,
         'discount_amount': discount_amount,
         'final_price': final_price,
@@ -1541,7 +1553,7 @@ def add_to_cart(request, course_id):
 def view_cart(request):
     cart, _ = Cart.objects.get_or_create(user=request.user)
     items = cart.items.select_related('course', 'course__teacher').all()
-    total = sum(item.course.price for item in items)
+    total = sum(item.course.get_effective_price() for item in items)
 
     # 優惠券整合進購物車：可領取 + 我的優惠券
     now = timezone.now()
@@ -1601,13 +1613,13 @@ def cart_checkout(request):
     if not items:
         return redirect('view_cart')
 
-    cart_total = sum(i.course.price for i in items)
+    cart_total = sum(i.course.get_effective_price() for i in items)
     coupon_discount = coupon.calculate_discount(cart_total) if coupon else 0
 
     total_original = 0
     total_discount = 0
     for item in items:
-        original = item.course.price
+        original = item.course.get_effective_price()
         promo = promo_map.get(item.course.id)
         promo_disc = 0
         if promo:
@@ -1631,7 +1643,7 @@ def cart_checkout(request):
         status='pending'
     )
     for item in items:
-        OrderItem.objects.create(order=order, course=item.course, price=item.course.price)
+        OrderItem.objects.create(order=order, course=item.course, price=item.course.get_effective_price())
     Payment.objects.create(
         order=order, amount=final_price, status='pending', method='mock'
     )

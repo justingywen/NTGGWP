@@ -69,8 +69,56 @@ class Course(models.Model):
     is_published = models.BooleanField(default=True, verbose_name="是否上架")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
 
+    # 教師自訂折扣（任何課程皆可設定，不限募資課程）
+    discount_price = models.PositiveIntegerField(
+        blank=True, null=True, verbose_name="折扣價（選填，需低於原價）"
+    )
+
+    # 募資開課
+    is_crowdfunding = models.BooleanField(default=False, verbose_name="是否為募資課程")
+    funding_goal = models.PositiveIntegerField(default=0, verbose_name="募資門檻人數")
+    funding_start_date = models.DateTimeField(blank=True, null=True, verbose_name="募資開始時間")
+    funding_end_date = models.DateTimeField(blank=True, null=True, verbose_name="募資結束時間")
+    early_bird_price = models.PositiveIntegerField(
+        blank=True, null=True, verbose_name="早鳥優惠價（募資期間適用，需低於原價）"
+    )
+
     def __str__(self):
         return self.title
+
+    def is_funding_active(self):
+        if not self.is_crowdfunding or not self.funding_start_date or not self.funding_end_date:
+            return False
+        now = timezone.now()
+        return self.funding_start_date <= now <= self.funding_end_date
+
+    def funding_backers_count(self):
+        return self.enrollment_set.count()
+
+    def funding_progress_percent(self):
+        if not self.funding_goal:
+            return 0
+        return min(100, round(self.funding_backers_count() / self.funding_goal * 100))
+
+    def funding_is_goal_met(self):
+        return self.funding_goal > 0 and self.funding_backers_count() >= self.funding_goal
+
+    def funding_days_left(self):
+        if not self.funding_end_date:
+            return 0
+        delta = self.funding_end_date - timezone.now()
+        return max(0, delta.days)
+
+    def get_effective_price(self):
+        """目前實際售價：募資期間內優先用早鳥價，其次一般折扣價，否則原價。"""
+        if self.is_crowdfunding and self.is_funding_active() and self.early_bird_price and self.early_bird_price < self.price:
+            return self.early_bird_price
+        if self.discount_price and self.discount_price < self.price:
+            return self.discount_price
+        return self.price
+
+    def has_discount(self):
+        return self.get_effective_price() < self.price
 
     class Meta:
         verbose_name = "課程"

@@ -163,9 +163,32 @@
                     {% if course.image %}<img src="{{ course.image.url }}" alt="{{ course.title }}" class="w-full h-full object-cover">
                     {% else %}<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand-400 to-violet-400 text-white text-4xl font-black">{{ course.title|slice:":1"|upper }}</div>{% endif %}
                 </div>
-                <div class="mb-6">
+                <div class="mb-4">
+                    {% if course.has_discount %}
+                    <div class="flex items-baseline gap-2 flex-wrap">
+                        <span class="text-lg text-red-500 line-through decoration-2">NT$ {{ course.price }}</span>
+                        <span class="text-3xl font-black text-red-600">NT$ {{ course.get_effective_price }}</span>
+                    </div>
+                    {% if course.is_crowdfunding and course.is_funding_active %}
+                    <span class="inline-block mt-1 bg-accent-50 text-accent-600 text-xs font-bold px-2.5 py-1 rounded-full">早鳥優惠價，僅限募資期間</span>
+                    {% endif %}
+                    {% else %}
                     <span class="text-3xl font-black text-slate-900">NT$ {{ course.price }}</span>
+                    {% endif %}
                 </div>
+
+                {% if course.is_crowdfunding and course.is_funding_active %}
+                <div class="bg-accent-50 rounded-xl p-4 mb-5">
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="font-black {% if course.funding_is_goal_met %}text-accent-600{% else %}text-slate-600{% endif %}">{{ course.funding_progress_percent }}% 達成</span>
+                        <span class="text-slate-400">剩 {{ course.funding_days_left }} 天</span>
+                    </div>
+                    <div class="h-2 w-full bg-white rounded-full overflow-hidden mb-2">
+                        <div class="h-full bg-gradient-to-r from-accent-400 to-accent-600 rounded-full" style="width:{{ course.funding_progress_percent }}%"></div>
+                    </div>
+                    <div class="text-sm text-slate-600"><i class="fas fa-user-group mr-1"></i>{{ course.funding_backers_count }} / {{ course.funding_goal }} 人已贊助</div>
+                </div>
+                {% endif %}
 
                 {% if user.is_authenticated %}
                     {% if already_purchased %}

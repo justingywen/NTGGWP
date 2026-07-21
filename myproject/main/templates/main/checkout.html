@@ -11,8 +11,15 @@
     <div class="text-slate-500 mb-5">講師：{{ course.teacher.username }}</div>
 
     <div class="divide-y divide-slate-100 mb-2">
+      {% if list_price != original_price %}
+      <div class="flex justify-between py-3 text-slate-700">
+        <span>課程定價</span>
+        <span><strong class="text-red-500 line-through decoration-2 font-normal mr-2">NT$ {{ list_price }}</strong><strong class="text-red-600">NT$ {{ original_price }}</strong></span>
+      </div>
+      {% else %}
       <div class="flex justify-between py-3 text-slate-700"><span>課程原價</span><strong>NT$ {{ original_price }}</strong></div>
-      <div class="flex justify-between py-3 text-slate-700"><span>折扣金額</span><strong>− NT$ {{ discount_amount }}</strong></div>
+      {% endif %}
+      <div class="flex justify-between py-3 text-slate-700"><span>優惠券折扣</span><strong>− NT$ {{ discount_amount }}</strong></div>
       <div class="flex justify-between py-3 text-xl font-black text-brand-700"><span>實付金額</span><span>NT$ {{ final_price }}</span></div>
     </div>
 
