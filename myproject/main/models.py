@@ -11,6 +11,9 @@ class Profile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="使用者")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, verbose_name="角色")
+    avatar = models.ImageField(
+        upload_to='avatars/', blank=True, null=True, verbose_name="大頭貼"
+    )
 
     def __str__(self):
         return f"{self.user.username} - {self.get_role_display()}"
@@ -66,8 +69,56 @@ class Course(models.Model):
     is_published = models.BooleanField(default=True, verbose_name="是否上架")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
 
+    # 教師自訂折扣（任何課程皆可設定，不限募資課程）
+    discount_price = models.PositiveIntegerField(
+        blank=True, null=True, verbose_name="折扣價（選填，需低於原價）"
+    )
+
+    # 募資開課
+    is_crowdfunding = models.BooleanField(default=False, verbose_name="是否為募資課程")
+    funding_goal = models.PositiveIntegerField(default=0, verbose_name="募資門檻人數")
+    funding_start_date = models.DateTimeField(blank=True, null=True, verbose_name="募資開始時間")
+    funding_end_date = models.DateTimeField(blank=True, null=True, verbose_name="募資結束時間")
+    early_bird_price = models.PositiveIntegerField(
+        blank=True, null=True, verbose_name="早鳥優惠價（募資期間適用，需低於原價）"
+    )
+
     def __str__(self):
         return self.title
+
+    def is_funding_active(self):
+        if not self.is_crowdfunding or not self.funding_start_date or not self.funding_end_date:
+            return False
+        now = timezone.now()
+        return self.funding_start_date <= now <= self.funding_end_date
+
+    def funding_backers_count(self):
+        return self.enrollment_set.count()
+
+    def funding_progress_percent(self):
+        if not self.funding_goal:
+            return 0
+        return min(100, round(self.funding_backers_count() / self.funding_goal * 100))
+
+    def funding_is_goal_met(self):
+        return self.funding_goal > 0 and self.funding_backers_count() >= self.funding_goal
+
+    def funding_days_left(self):
+        if not self.funding_end_date:
+            return 0
+        delta = self.funding_end_date - timezone.now()
+        return max(0, delta.days)
+
+    def get_effective_price(self):
+        """目前實際售價：募資期間內優先用早鳥價，其次一般折扣價，否則原價。"""
+        if self.is_crowdfunding and self.is_funding_active() and self.early_bird_price and self.early_bird_price < self.price:
+            return self.early_bird_price
+        if self.discount_price and self.discount_price < self.price:
+            return self.discount_price
+        return self.price
+
+    def has_discount(self):
+        return self.get_effective_price() < self.price
 
     class Meta:
         verbose_name = "課程"
@@ -105,6 +156,12 @@ class CourseLesson(models.Model):
     title = models.CharField(max_length=200, verbose_name="單元名稱")
     content = models.TextField(blank=True, null=True, verbose_name="單元內容")
     video_url = models.URLField(blank=True, null=True, verbose_name="影片連結")
+    video_file = models.FileField(
+        upload_to='course_videos/',
+        blank=True,
+        null=True,
+        verbose_name="上傳影片檔"
+    )
     duration_minutes = models.PositiveIntegerField(default=0, verbose_name="影片分鐘數")
     sort_order = models.PositiveIntegerField(default=1, verbose_name="單元順序")
     is_free_preview = models.BooleanField(default=False, verbose_name="是否免費試看")
@@ -154,6 +211,33 @@ class LearningRecord(models.Model):
         verbose_name_plural = "學習紀錄"
 
 
+class LessonProgress(models.Model):
+    """單元觀看進度：累積實際看過的秒數 + 續看位置（跨次保留）。"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="使用者")
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, verbose_name="課程")
+    lesson = models.ForeignKey(CourseLesson, on_delete=models.CASCADE, verbose_name="單元")
+    # 每一秒是否看過的 bitmap（'0'/'1'），跨次累積、快轉跳過的秒不會被算入
+    watched_map = models.TextField(blank=True, default='', verbose_name="已觀看秒圖")
+    watched_seconds = models.PositiveIntegerField(default=0, verbose_name="累積觀看秒數")
+    last_position = models.PositiveIntegerField(default=0, verbose_name="上次觀看位置(秒)")
+    duration = models.PositiveIntegerField(default=0, verbose_name="影片總長(秒)")
+    is_completed = models.BooleanField(default=False, verbose_name="是否完成")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+
+    def percent(self):
+        if self.duration <= 0:
+            return 0
+        return min(100, int(self.watched_seconds / self.duration * 100))
+
+    def __str__(self):
+        return f"{self.user.username} - {self.lesson.title} - {self.percent()}%"
+
+    class Meta:
+        verbose_name = "單元觀看進度"
+        verbose_name_plural = "單元觀看進度"
+        unique_together = ('user', 'lesson')
+
+
 class Coupon(models.Model):
     DISCOUNT_TYPE_CHOICES = [
         ('amount', '固定金額折扣'),
@@ -192,7 +276,27 @@ class Coupon(models.Model):
                 return False
         return True
 
+    def is_expired(self):
+        return timezone.now() > self.end_date
+
+    def status_label(self):
+        """後台/前台顯示用的目前狀態文字。"""
+        now = timezone.now()
+        if not self.is_active:
+            return '已停用'
+        if self.start_date > now:
+            return '未開始'
+        if self.end_date < now:
+            return '已過期'
+        if self.usage_limit > 0 and self.usages.count() >= self.usage_limit:
+            return '已用完'
+        return '使用中'
+
     def calculate_discount(self, price):
+        # 期限/啟用/使用次數任一不符 → 一律 0 折扣（防止過期券被折抵）
+        if not self.is_valid_now():
+            return 0
+
         if price < self.min_spend:
             return 0
 
@@ -230,6 +334,12 @@ class UserCoupon(models.Model):
     )
     received_at = models.DateTimeField(auto_now_add=True, verbose_name="領取時間")
     used_at = models.DateTimeField(blank=True, null=True, verbose_name="使用時間")
+
+    def effective_status(self):
+        """顯示用：尚未使用但券已過期 → 顯示已過期。"""
+        if self.status == 'unused' and self.coupon.is_expired():
+            return '已過期'
+        return self.get_status_display()
 
     def __str__(self):
         return f"{self.user.username} - {self.coupon.code} - {self.get_status_display()}"
@@ -378,7 +488,8 @@ class CouponUsage(models.Model):
 class Payment(models.Model):
     PAYMENT_METHOD_CHOICES = [
         ('credit_card', '信用卡'),
-        ('atm', 'ATM轉帳'),
+        ('atm', 'ATM 虛擬帳號轉帳'),
+        ('cvs', '超商代碼繳費'),
         ('line_pay', 'LINE Pay'),
         ('cash', '現金'),
         ('mock', '模擬付款'),
@@ -416,6 +527,14 @@ class Payment(models.Model):
         null=True,
         verbose_name="交易編號"
     )
+    # 模擬金流用（未來串接真金流時由 gateway 回傳填入）
+    virtual_account = models.CharField(
+        max_length=30, blank=True, null=True, verbose_name="ATM 虛擬帳號"
+    )
+    payment_code = models.CharField(
+        max_length=30, blank=True, null=True, verbose_name="超商繳費代碼"
+    )
+    expire_at = models.DateTimeField(blank=True, null=True, verbose_name="繳費期限")
     paid_at = models.DateTimeField(blank=True, null=True, verbose_name="付款時間")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
 

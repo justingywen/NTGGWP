@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-!myfgv08#hs01651h)z0w9m48ywynf10)135pb!5tnmn%zug2n
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 
 # Application definition
@@ -55,13 +55,14 @@ ROOT_URLCONF = 'myproject.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'main.context_processors.nav_context',
             ],
         },
     },
@@ -78,7 +79,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'course_platform_db',
         'USER': 'root',
-        'PASSWORD': '221302',
+        'PASSWORD': '123456',        
         'HOST': '127.0.0.1',
         'PORT': '3306',
         'OPTIONS': {
