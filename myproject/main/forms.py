@@ -10,8 +10,6 @@ from .models import (
     CourseAnswer,
     Profile,
 )
-
-
 class CourseForm(forms.ModelForm):
     field_order = [
         'title', 'category', 'level', 'description', 'image',
