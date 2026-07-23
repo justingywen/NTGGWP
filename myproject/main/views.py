@@ -83,11 +83,23 @@ def home(request):
     paginator = Paginator(qs, 8)
     page_obj = paginator.get_page(request.GET.get('page'))
 
-    # 評分只計算本頁課程
-    for c in page_obj:
-        stats = Review.objects.filter(course=c).aggregate(avg=Avg('rating'), n=Count('id'))
-        c.avg_rating = round(stats['avg'], 1) if stats['avg'] else None
-        c.review_count = stats['n']
+    # 評分：一次查完本頁所有課程，避免每堂課各發一次查詢（遠端 DB 的 N+1 效能殺手）
+    def _attach_reviews(courses):
+        courses = list(courses)
+        ids = [c.id for c in courses]
+        stats_map = {
+            row['course']: row
+            for row in Review.objects.filter(course_id__in=ids)
+            .values('course')
+            .annotate(avg=Avg('rating'), n=Count('id'))
+        }
+        for c in courses:
+            s = stats_map.get(c.id)
+            c.avg_rating = round(s['avg'], 1) if s and s['avg'] else None
+            c.review_count = s['n'] if s else 0
+        return courses
+
+    _attach_reviews(page_obj.object_list)
 
     categories = CourseCategory.objects.order_by('name')
     total_students = Enrollment.objects.values('student').distinct().count()
@@ -96,12 +108,7 @@ def home(request):
     avg_all = round(avg_all, 1) if avg_all else 4.8
 
     def _decorate(qs):
-        items = list(qs)
-        for c in items:
-            stats = Review.objects.filter(course=c).aggregate(avg=Avg('rating'), n=Count('id'))
-            c.avg_rating = round(stats['avg'], 1) if stats['avg'] else None
-            c.review_count = stats['n']
-        return items
+        return _attach_reviews(qs)
 
     base_pub = Course.objects.filter(is_published=True).select_related('teacher', 'category')
     popular_courses = _decorate(

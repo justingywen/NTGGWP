@@ -93,6 +93,8 @@ DATABASES = {
         'PASSWORD': os.environ.get('DB_PASSWORD', '123456'),
         'HOST': os.environ.get('DB_HOST', '127.0.0.1'),
         'PORT': os.environ.get('DB_PORT', '3306'),
+        # 遠端資料庫每次重新建立連線很花時間，保持連線 60 秒重複使用
+        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
         'OPTIONS': {
             'charset': 'utf8mb4',
         },
