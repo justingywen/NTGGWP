@@ -10,20 +10,29 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# 讀取專案根目錄的 .env（放共用資料庫連線資訊等機密，不會進版控）
+load_dotenv(BASE_DIR.parent / '.env')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-!myfgv08#hs01651h)z0w9m48ywynf10)135pb!5tnmn%zug2n'
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-!myfgv08#hs01651h)z0w9m48ywynf10)135pb!5tnmn%zug2n',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
@@ -74,19 +83,26 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# 連線資訊全部從環境變數(.env)讀取；沒設定時 fallback 回本機預設，
+# 這樣沒建 .env 的人仍可跑本機 MySQL，設了 .env 就會連到共用雲端資料庫。
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'course_platform_db',
-        'USER': 'root',
-        'PASSWORD': '123456',        
-        'HOST': '127.0.0.1',
-        'PORT': '3306',
+        'NAME': os.environ.get('DB_NAME', 'course_platform_db'),
+        'USER': os.environ.get('DB_USER', 'root'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', '123456'),
+        'HOST': os.environ.get('DB_HOST', '127.0.0.1'),
+        'PORT': os.environ.get('DB_PORT', '3306'),
         'OPTIONS': {
             'charset': 'utf8mb4',
         },
     }
 }
+
+# 部分雲端 MySQL（如 Aiven）需要 TLS，把平台給的 ca.pem 路徑填在 DB_SSL_CA 即可。
+_db_ssl_ca = os.environ.get('DB_SSL_CA')
+if _db_ssl_ca:
+    DATABASES['default']['OPTIONS']['ssl'] = {'ca': _db_ssl_ca}
 
 
 # Password validation
