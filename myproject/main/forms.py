@@ -1,6 +1,5 @@
 from django import forms
 from django.contrib.auth.models import User
-from django.utils.safestring import mark_safe
 from .models import (
     Course,
     CourseCategory,
@@ -13,31 +12,9 @@ from .models import (
 )
 
 
-class ListTextWidget(forms.TextInput):
-    """可輸入的下拉：附掛 datalist，選現有或直接打新的都行。"""
-    def __init__(self, data_list, list_id, attrs=None):
-        super().__init__(attrs)
-        self._list = data_list
-        self._list_id = list_id
-        self.attrs.update({'list': list_id, 'autocomplete': 'off'})
-
-    def render(self, name, value, attrs=None, renderer=None):
-        text_html = super().render(name, value, attrs=attrs, renderer=renderer)
-        options = ''.join('<option value="%s">' % item for item in self._list)
-        datalist = '<datalist id="%s">%s</datalist>' % (self._list_id, options)
-        return mark_safe(text_html + datalist)
-
-
 class CourseForm(forms.ModelForm):
-    # 單一欄位：整合「選現有分類」與「輸入新分類」
-    category_name = forms.CharField(
-        label='課程分類',
-        max_length=100,
-        help_text='可點選現有分類，或直接輸入新分類（自動建立）',
-    )
-
     field_order = [
-        'title', 'category_name', 'level', 'description', 'image',
+        'title', 'category', 'level', 'description', 'image',
         'price', 'discount_price',
         'is_crowdfunding', 'funding_goal', 'funding_start_date', 'funding_end_date', 'early_bird_price',
     ]
@@ -45,12 +22,13 @@ class CourseForm(forms.ModelForm):
     class Meta:
         model = Course
         fields = [
-            'title', 'level', 'price', 'description', 'image',
+            'title', 'category', 'level', 'price', 'description', 'image',
             'discount_price',
             'is_crowdfunding', 'funding_goal', 'funding_start_date', 'funding_end_date', 'early_bird_price',
         ]
         labels = {
             'title': '課程名稱',
+            'category': '課程分類',
             'level': '課程難度',
             'price': '原價',
             'description': '課程介紹',
@@ -86,23 +64,10 @@ class CourseForm(forms.ModelForm):
         self.fields['early_bird_price'].required = False
         self.fields['discount_price'].required = False
 
-        names = list(
-            CourseCategory.objects.order_by('name').values_list('name', flat=True)
-        )
-        self.fields['category_name'].widget = ListTextWidget(
-            data_list=names,
-            list_id='category_options',
-            attrs={'placeholder': '選擇或輸入分類名稱'}
-        )
-        # 編輯時帶入原本分類
-        if self.instance and self.instance.pk and self.instance.category:
-            self.fields['category_name'].initial = self.instance.category.name
-
-    def clean_category_name(self):
-        name = (self.cleaned_data.get('category_name') or '').strip()
-        if not name:
-            raise forms.ValidationError('請選擇或輸入課程分類。')
-        return name
+        # 分類改為固定清單挑選（由管理員在後台維護），教師不可自訂新分類
+        self.fields['category'].queryset = CourseCategory.objects.order_by('name')
+        self.fields['category'].required = True
+        self.fields['category'].empty_label = '請選擇課程分類'
 
     def clean(self):
         cleaned = super().clean()
@@ -128,16 +93,6 @@ class CourseForm(forms.ModelForm):
                 self.add_error('early_bird_price', '早鳥優惠價必須低於原價。')
 
         return cleaned
-
-    def save(self, commit=True):
-        course = super().save(commit=False)
-        category, _ = CourseCategory.objects.get_or_create(
-            name=self.cleaned_data['category_name']
-        )
-        course.category = category
-        if commit:
-            course.save()
-        return course
 
 
 class ChapterForm(forms.ModelForm):
