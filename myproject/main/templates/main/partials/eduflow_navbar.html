@@ -1,4 +1,18 @@
+{% with is_home=request.resolver_match.url_name|default:'' %}
 <!-- ============ 頂部公告列（可關閉） ============ -->
+{% if is_home == 'home' %}
+<div id="announcement-bar" class="bg-electric text-white text-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-10 flex items-center justify-center gap-3">
+        <i class="fas fa-bullhorn text-accent-400"></i>
+        <span class="hidden sm:inline">新學期優惠開跑！於購物車輸入折扣碼</span>
+        <code class="bg-white/15 px-2 py-0.5 rounded font-mono tracking-wider text-accent-300">NEW100</code>
+        <span class="hidden md:inline">立即折抵 NT$100</span>
+        <button data-close="#announcement-bar" class="ml-2 text-white/60 hover:text-white transition" aria-label="關閉公告">
+            <i class="fas fa-xmark"></i>
+        </button>
+    </div>
+</div>
+{% else %}
 <div id="announcement-bar" class="bg-brand-800 text-white text-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-10 flex items-center justify-center gap-3">
         <i class="fas fa-bullhorn text-accent-400"></i>
@@ -10,49 +24,57 @@
         </button>
     </div>
 </div>
+{% endif %}
 
 <!-- ============ 導覽列 ============ -->
+{% if is_home == 'home' %}
+<nav id="navbar" class="bg-black border-b border-satdark-border sticky top-0 z-50 transition-shadow" style="box-shadow: 0 1px 0 0 #000">
+{% else %}
 <nav id="navbar" class="bg-jp-bg/80 backdrop-blur-md border-b border-jp-border sticky top-0 z-50 transition-shadow">
+{% endif %}
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16 items-center gap-4">
 
             <!-- Logo + 課程 -->
             <div class="flex items-center gap-8">
-                <a href="{% url 'home' %}" class="flex items-center gap-2 text-2xl font-bold tracking-wide text-jp-text shrink-0">
+                <a href="{% url 'home' %}" class="flex items-center gap-2 text-2xl font-bold tracking-wide {% if is_home == 'home' %}text-satdark-text{% else %}text-jp-text{% endif %} shrink-0">
                     <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-700 to-brand-500 text-white text-lg">
                         <i class="fas fa-graduation-cap"></i>
                     </span>
                     EduFlow
                 </a>
-                <a href="{% url 'course_catalog' %}" class="hidden lg:inline text-jp-muted hover:text-jp-primary font-medium">課程</a>
+                <a href="{% url 'course_catalog' %}" class="hidden lg:inline {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} font-medium">課程</a>
             </div>
 
             <!-- 右側動作區 -->
             <div class="flex items-center gap-1 sm:gap-3">
-                <button type="button" data-search-toggle class="p-2 text-jp-muted hover:text-jp-primary transition" aria-label="搜尋">
+                <button type="button" data-search-toggle class="p-2 {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} transition" aria-label="搜尋">
                     <i class="fas fa-search text-lg"></i>
                 </button>
                 {% if user.is_authenticated %}
-                    {% if user.is_superuser %}
-                    <a href="/admin/" class="hidden lg:inline text-jp-muted hover:text-jp-primary font-medium px-2">管理後台</a>
-                    <a href="{% url 'platform_analytics' %}" class="hidden lg:inline text-jp-muted hover:text-jp-primary font-medium px-2">數據分析</a>
-                    <a href="{% url 'export_data_page' %}" class="hidden lg:inline text-jp-muted hover:text-jp-primary font-medium px-2">資料匯出</a>
+                    {% if nav_role == 'teacher' %}
+                    <a href="{% url 'teacher_dashboard' %}" class="hidden lg:inline {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} font-medium px-2">教師專區</a>
+                    {% elif user.is_superuser %}
+                    <a href="/admin/" class="hidden lg:inline {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} font-medium px-2">管理後台</a>
+                    <a href="{% url 'platform_analytics' %}" class="hidden lg:inline {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} font-medium px-2">數據分析</a>
+                    <a href="{% url 'export_data_page' %}" class="hidden lg:inline {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} font-medium px-2">資料匯出</a>
+                    <a href="{% url 'manage_withdrawals' %}" class="hidden lg:inline {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} font-medium px-2">提領審核</a>
                     {% else %}
-                    <a href="{% url 'my_courses' %}" class="hidden lg:inline text-jp-muted hover:text-jp-primary font-medium px-2">我的課程</a>
+                    <a href="{% url 'my_courses' %}" class="hidden lg:inline {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} font-medium px-2">我的課程</a>
                     {% if nav_can_teach %}
-                    <a href="{% url 'teacher_dashboard' %}" class="hidden lg:inline text-jp-muted hover:text-jp-primary font-medium px-2">進入教師專區</a>
+                    <a href="{% url 'teacher_dashboard' %}" class="hidden lg:inline {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} font-medium px-2">進入教師專區</a>
                     {% endif %}
                     {% endif %}
 
                     <!-- 通知 -->
-                    <a href="{% url 'notifications' %}" class="relative p-2 text-jp-muted hover:text-jp-primary transition" aria-label="通知">
+                    <a href="{% url 'notifications' %}" class="relative p-2 {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} transition" aria-label="通知">
                         <i class="fas fa-bell text-lg"></i>
-                        {% if nav_unread_count %}<span class="absolute -top-0.5 -right-0.5 bg-accent-500 text-white text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">{{ nav_unread_count }}</span>{% endif %}
+                        {% if nav_unread_count %}<span class="absolute -top-0.5 -right-0.5 bg-jp-accent text-white text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">{{ nav_unread_count }}</span>{% endif %}
                     </a>
                     <!-- 購物車 -->
-                    <a href="{% url 'view_cart' %}" class="relative p-2 text-jp-muted hover:text-jp-primary transition" aria-label="購物車">
+                    <a href="{% url 'view_cart' %}" class="relative p-2 {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} transition" aria-label="購物車">
                         <i class="fas fa-shopping-cart text-lg"></i>
-                        {% if nav_cart_count %}<span class="absolute -top-0.5 -right-0.5 bg-accent-500 text-white text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">{{ nav_cart_count }}</span>{% endif %}
+                        {% if nav_cart_count %}<span class="absolute -top-0.5 -right-0.5 bg-jp-accent text-white text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">{{ nav_cart_count }}</span>{% endif %}
                     </a>
                     <a href="{% url 'profile' %}" class="hidden sm:flex items-center gap-2 pl-2">
                         {% if nav_avatar_url %}
@@ -61,21 +83,35 @@
                         <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-700 to-brand-500 text-white text-sm font-bold">{{ user.username|slice:":1"|upper }}</span>
                         {% endif %}
                     </a>
-                    <a href="{% url 'logout' %}" class="hidden sm:inline-block text-jp-muted hover:text-jp-primary px-2 py-2 rounded-lg font-medium transition">登出</a>
+                    <a href="{% url 'logout' %}" class="hidden sm:inline-block {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} px-2 py-2 rounded-lg font-medium transition">登出</a>
                 {% else %}
-                    <a href="{% url 'view_cart' %}" class="relative p-2 text-jp-muted hover:text-jp-primary transition" aria-label="購物車">
+                    <a href="{% url 'view_cart' %}" class="relative p-2 {% if is_home == 'home' %}text-satdark-muted hover:text-electric{% else %}text-jp-muted hover:text-jp-primary{% endif %} transition" aria-label="購物車">
                         <i class="fas fa-shopping-cart text-lg"></i>
                     </a>
+                    {% if is_home == 'home' %}
+                    <a href="{% url 'login' %}" class="hidden sm:inline-block text-satdark-text hover:bg-white/10 px-3 py-2 rounded-lg font-medium transition">登入</a>
+                    <a href="{% url 'register' %}" class="bg-electric text-white hover:bg-electric-hover px-4 py-2 rounded-lg font-medium transition">免費註冊</a>
+                    {% else %}
                     <a href="{% url 'login' %}" class="hidden sm:inline-block text-jp-primary hover:bg-brand-50 px-3 py-2 rounded-lg font-medium transition">登入</a>
                     <a href="{% url 'register' %}" class="bg-jp-primary text-white hover:bg-jp-primaryHover px-4 py-2 rounded-lg font-medium shadow-sm shadow-brand-600/20 transition">免費註冊</a>
+                    {% endif %}
                 {% endif %}
 
                 <!-- 手機漢堡 -->
-                <button data-mobile-toggle class="lg:hidden p-2 text-jp-text" aria-label="開啟選單"><i class="fas fa-bars text-xl"></i></button>
+                <button data-mobile-toggle class="lg:hidden p-2 {% if is_home == 'home' %}text-satdark-text{% else %}text-jp-text{% endif %}" aria-label="開啟選單"><i class="fas fa-bars text-xl"></i></button>
             </div>
         </div>
 
         <!-- 展開式搜尋列（點搜尋圖示切換顯示） -->
+        {% if is_home == 'home' %}
+        <div data-search-panel class="hidden border-t border-satdark-border py-3">
+            <form action="{% url 'course_catalog' %}" method="get" class="relative max-w-lg mx-auto" role="search">
+                <input type="text" name="q" value="{{ request.GET.q }}" placeholder="搜尋課程、老師、關鍵字…" autofocus
+                       class="w-full bg-satdark-surface border border-satdark-border text-satdark-text focus:border-electric focus:ring-2 focus:ring-electric/30 rounded-full py-2.5 pl-11 pr-4 text-sm outline-none transition placeholder:text-satdark-muted">
+                <button type="submit" class="absolute left-4 top-3 text-satdark-muted" aria-label="搜尋"><i class="fas fa-search"></i></button>
+            </form>
+        </div>
+        {% else %}
         <div data-search-panel class="hidden border-t border-jp-border py-3">
             <form action="{% url 'course_catalog' %}" method="get" class="relative max-w-lg mx-auto" role="search">
                 <input type="text" name="q" value="{{ request.GET.q }}" placeholder="搜尋課程、老師、關鍵字…" autofocus
@@ -83,12 +119,55 @@
                 <button type="submit" class="absolute left-4 top-3 text-jp-muted" aria-label="搜尋"><i class="fas fa-search"></i></button>
             </form>
         </div>
+        {% endif %}
     </div>
 </nav>
+{% endwith %}
 
+{% with is_home=request.resolver_match.url_name|default:'' %}
 <!-- ============ 手機側邊選單 ============ -->
 <div data-mobile-menu class="fixed inset-0 z-[60] hidden lg:hidden">
     <div data-mobile-close class="absolute inset-0 bg-jp-text/50 backdrop-blur-sm"></div>
+    {% if is_home == 'home' %}
+    <aside class="absolute right-0 top-0 h-full w-80 max-w-[85%] bg-satdark-surface shadow-2xl p-6 flex flex-col gap-1 overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+            <span class="text-xl font-bold tracking-wide text-satdark-text">EduFlow</span>
+            <button data-mobile-close class="p-2 text-satdark-muted" aria-label="關閉選單"><i class="fas fa-xmark text-xl"></i></button>
+        </div>
+        <form action="{% url 'course_catalog' %}" method="get" class="relative mb-3">
+            <input type="text" name="q" value="{{ request.GET.q }}" placeholder="搜尋課程…" class="w-full bg-satdark-bg border border-satdark-border text-satdark-text placeholder:text-satdark-muted rounded-full py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-electric/30">
+            <button type="submit" class="absolute left-3.5 top-3 text-satdark-muted"><i class="fas fa-search"></i></button>
+        </form>
+        <a href="{% url 'course_catalog' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">探索課程</a>
+        {% if user.is_authenticated %}
+            <a href="{% url 'view_cart' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">購物車{% if nav_cart_count %}（{{ nav_cart_count }}）{% endif %}</a>
+            <a href="{% url 'notifications' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">通知{% if nav_unread_count %}（{{ nav_unread_count }}）{% endif %}</a>
+            {% if nav_role == 'teacher' %}
+            <a href="{% url 'teacher_dashboard' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">教師專區</a>
+            <a href="{% url 'my_revenue' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">我的收支</a>
+            <a href="{% url 'my_withdrawals' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">提領申請</a>
+            {% elif user.is_superuser %}
+            <a href="/admin/" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">管理後台</a>
+            <a href="{% url 'platform_analytics' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">數據分析</a>
+            <a href="{% url 'export_data_page' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">資料匯出</a>
+            <a href="{% url 'manage_withdrawals' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">提領審核</a>
+            {% else %}
+            <a href="{% url 'my_courses' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">我的課程</a>
+            <a href="{% url 'student_dashboard' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">學生專區</a>
+            {% if nav_can_teach %}
+            <a href="{% url 'teacher_dashboard' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">進入教師專區</a>
+            {% endif %}
+            {% endif %}
+            <a href="{% url 'profile' %}" class="px-3 py-3 rounded-lg hover:bg-white/5 text-satdark-text font-medium">個人資料</a>
+            <div class="border-t border-satdark-border my-3"></div>
+            <a href="{% url 'logout' %}" class="w-full text-center bg-white/5 hover:bg-white/10 text-satdark-text py-2.5 rounded-lg font-medium">登出</a>
+        {% else %}
+            <div class="border-t border-satdark-border my-3"></div>
+            <a href="{% url 'login' %}" class="w-full text-center text-satdark-text border border-satdark-border hover:bg-white/5 py-2.5 rounded-lg font-medium mb-2">登入</a>
+            <a href="{% url 'register' %}" class="w-full text-center bg-electric text-white hover:bg-electric-hover py-2.5 rounded-lg font-medium">免費註冊</a>
+        {% endif %}
+    </aside>
+    {% else %}
     <aside class="absolute right-0 top-0 h-full w-80 max-w-[85%] bg-jp-surface shadow-2xl p-6 flex flex-col gap-1 overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
             <span class="text-xl font-bold tracking-wide text-jp-text">EduFlow</span>
@@ -122,4 +201,6 @@
             <a href="{% url 'register' %}" class="w-full text-center bg-jp-primary text-white hover:bg-jp-primaryHover py-2.5 rounded-lg font-medium">免費註冊</a>
         {% endif %}
     </aside>
+    {% endif %}
 </div>
+{% endwith %}

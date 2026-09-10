@@ -33,6 +33,18 @@
                             primaryHover: '#1f375c',
                             accent: '#d9822b',
                         },
+                        // sat.cool 風格深色主題，僅首頁使用，不影響其他頁面既有的 jp/brand 色階
+                        satdark: {
+                            bg: '#030303',
+                            surface: '#17191c',
+                            border: '#2a2d31',
+                            text: '#ffffff',
+                            muted: '#9a9a9a',
+                        },
+                        electric: {
+                            DEFAULT: '#005cff',
+                            hover: '#0047c4',
+                        },
                     },
                     fontFamily: { sans: ['"Noto Sans TC"', '"Inter"', 'system-ui', 'sans-serif'] },
                     keyframes: {
@@ -90,7 +102,7 @@
     {% include 'main/partials/eduflow_footer.html' %}
 
     <!-- 回到頂部按鈕 -->
-    <button data-back-to-top class="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-brand-600 text-white shadow-lg shadow-brand-600/30 hover:bg-brand-700 transition opacity-0 invisible" aria-label="回到頂部">
+    <button data-back-to-top class="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-jp-primary text-white shadow-lg shadow-brand-600/30 hover:bg-jp-primaryHover transition opacity-0 invisible" aria-label="回到頂部">
         <i class="fas fa-arrow-up"></i>
     </button>
 

@@ -2,170 +2,207 @@
 {% block title %}EduFlow | 探索無限學習可能 — 頂尖線上購課平台{% endblock %}
 
 {% block content %}
+<div class="bg-satdark-bg">
 <!-- ============ Hero ============ -->
-<header class="relative overflow-hidden bg-jp-bg border-b border-jp-border">
-    <div class="pointer-events-none absolute -top-24 -right-24 h-96 w-96 rounded-full bg-brand-100/40 blur-3xl"></div>
-    <div class="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-accent-100/40 blur-3xl"></div>
+<header class="relative overflow-hidden bg-satdark-bg border-b border-satdark-border">
+    <div class="pointer-events-none absolute -top-24 -right-24 h-96 w-96 rounded-full bg-electric/10 blur-3xl"></div>
+    <div class="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-electric/10 blur-3xl"></div>
 
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
         <div class="grid lg:grid-cols-2 gap-16 items-center">
             <div class="animate-fade-up">
-                <span class="inline-flex items-center gap-2 bg-jp-surface border border-jp-border px-3 py-1 rounded-full text-sm font-medium mb-6 text-jp-muted">
-                    <i class="fas fa-star text-jp-accent"></i> 全台學員信賴的線上學習平台
+                <span class="inline-flex items-center gap-2 bg-black/40 border border-satdark-border px-3 py-1 rounded-full text-sm font-medium mb-6 text-satdark-muted">
+                    <i class="fas fa-star text-electric"></i> 全台學員信賴的線上學習平台
                 </span>
-                <h1 class="text-3xl md:text-5xl font-bold tracking-wide leading-tight mb-6 text-jp-text">
+                <h1 class="text-3xl md:text-5xl font-bold tracking-wide leading-tight mb-6 text-satdark-text">
                     學習不設限，<br>
-                    <span class="text-jp-primary">開啟你的知識新篇章</span>
+                    <span class="text-electric">開啟你的知識新篇章</span>
                 </h1>
-                <p class="text-lg text-jp-muted mb-10 max-w-xl leading-relaxed">
+                <p class="text-lg text-satdark-muted mb-10 max-w-xl leading-relaxed">
                     集結業界專家親授的精選課程，搭配數據分析與 AI 智慧推薦。現在就加入 EduFlow，投資最值得的自己。
                 </p>
 
                 <div class="flex flex-wrap gap-3 mb-10">
-                    <a href="{% url 'course_catalog' %}" class="bg-jp-primary hover:bg-jp-primaryHover text-white font-medium tracking-wide px-8 py-3.5 rounded-xl transition">瀏覽課程</a>
-                    <a href="{% url 'register' %}" class="bg-jp-surface hover:bg-jp-bg border border-jp-border text-jp-text font-medium tracking-wide px-8 py-3.5 rounded-xl transition">免費註冊</a>
+                    <a href="{% url 'course_catalog' %}" class="bg-electric hover:bg-electric-hover text-white font-medium tracking-wide px-8 py-3.5 rounded-md transition">瀏覽課程</a>
+                    <a href="{% url 'register' %}" class="bg-transparent hover:bg-white/5 border border-satdark-border text-satdark-text font-medium tracking-wide px-8 py-3.5 rounded-md transition">免費註冊</a>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2 mb-10 text-sm text-jp-muted">
+                <div class="flex flex-wrap items-center gap-2 mb-10 text-sm text-satdark-muted">
                     <span>熱門分類：</span>
                     {% for category in categories|slice:":4" %}
-                    <a href="{% url 'course_catalog' %}?cat={{ category.name }}" class="bg-jp-surface border border-jp-border hover:border-jp-primary hover:text-jp-primary px-3 py-1 rounded-full transition">{{ category.name }}</a>
+                    <a href="{% url 'course_catalog' %}?cat={{ category.name }}" class="bg-satdark-surface border border-satdark-border hover:border-electric hover:text-electric px-3 py-1 rounded-full transition">{{ category.name }}</a>
                     {% endfor %}
                 </div>
 
                 <div class="flex flex-wrap gap-10">
-                    <div><div class="text-3xl font-bold text-jp-text">{{ total_courses }}+</div><div class="text-sm text-jp-muted">精選課程</div></div>
-                    <div><div class="text-3xl font-bold text-jp-text">{{ total_students }}+</div><div class="text-sm text-jp-muted">累積學員</div></div>
-                    <div><div class="text-3xl font-bold text-jp-text">{{ avg_all }}<span class="text-lg">/5</span></div><div class="text-sm text-jp-muted">平均評價</div></div>
+                    <div><div class="text-3xl font-bold text-satdark-text">{{ total_courses }}+</div><div class="text-sm text-satdark-muted">精選課程</div></div>
+                    <div><div class="text-3xl font-bold text-satdark-text">{{ total_students }}+</div><div class="text-sm text-satdark-muted">累積學員</div></div>
+                    <div><div class="text-3xl font-bold text-satdark-text">{{ avg_all }}<span class="text-lg">/5</span></div><div class="text-sm text-satdark-muted">平均評價</div></div>
                 </div>
             </div>
 
             <div class="hidden lg:block relative h-[460px]">
-                <div class="absolute top-0 right-8 w-64 bg-jp-surface border border-jp-border rounded-2xl shadow-xl p-4 animate-float">
-                    <div class="aspect-video rounded-xl bg-gradient-to-br from-brand-700 to-brand-500 mb-3 flex items-center justify-center text-white text-3xl"><i class="fas fa-play"></i></div>
-                    <div class="h-3 w-3/4 bg-jp-bg rounded mb-2"></div>
-                    <div class="h-3 w-1/2 bg-jp-bg rounded"></div>
+                <div class="absolute top-0 right-8 w-64 bg-satdark-surface border border-satdark-border rounded-2xl shadow-xl p-4 animate-float">
+                    <div class="aspect-video rounded-xl bg-gradient-to-br from-electric to-brand-700 mb-3 flex items-center justify-center text-white text-3xl"><i class="fas fa-play"></i></div>
+                    <div class="h-3 w-3/4 bg-satdark-bg rounded mb-2"></div>
+                    <div class="h-3 w-1/2 bg-satdark-bg rounded"></div>
                 </div>
-                <div class="absolute top-40 left-0 w-52 bg-jp-surface border border-jp-border rounded-2xl shadow-xl p-4 animate-float" style="animation-delay:-2s">
+                <div class="absolute top-40 left-0 w-52 bg-satdark-surface border border-satdark-border rounded-2xl shadow-xl p-4 animate-float" style="animation-delay:-2s">
                     <div class="flex items-center gap-3 mb-2">
-                        <div class="h-10 w-10 rounded-full bg-jp-accent flex items-center justify-center text-white"><i class="fas fa-trophy"></i></div>
-                        <div><div class="font-medium text-jp-text text-sm">結業證書</div><div class="text-xs text-jp-muted">完課即可領取</div></div>
+                        <div class="h-10 w-10 rounded-full bg-electric flex items-center justify-center text-white"><i class="fas fa-trophy"></i></div>
+                        <div><div class="font-medium text-satdark-text text-sm">結業證書</div><div class="text-xs text-satdark-muted">完課即可領取</div></div>
                     </div>
-                    <div class="h-2 w-full bg-jp-bg rounded-full overflow-hidden"><div class="h-full w-4/5 bg-jp-accent rounded-full"></div></div>
+                    <div class="h-2 w-full bg-satdark-bg rounded-full overflow-hidden"><div class="h-full w-4/5 bg-electric rounded-full"></div></div>
                 </div>
-                <div class="absolute bottom-4 right-16 w-56 bg-jp-surface border border-jp-border rounded-2xl shadow-xl p-4 animate-float" style="animation-delay:-4s">
-                    <div class="text-xs text-jp-muted mb-1">累積學員</div>
-                    <div class="text-2xl font-bold text-jp-primary">{{ total_students }}+ <span class="text-green-600 text-sm"><i class="fas fa-arrow-trend-up"></i></span></div>
+                <div class="absolute bottom-4 right-16 w-56 bg-satdark-surface border border-satdark-border rounded-2xl shadow-xl p-4 animate-float" style="animation-delay:-4s">
+                    <div class="text-xs text-satdark-muted mb-1">累積學員</div>
+                    <div class="text-2xl font-bold text-electric">{{ total_students }}+ <span class="text-green-400 text-sm"><i class="fas fa-arrow-trend-up"></i></span></div>
                 </div>
             </div>
         </div>
     </div>
 </header>
 
+<!-- ============ 課程／講師 瀏覽入口 ============ -->
+<section class="bg-satdark-bg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div class="grid sm:grid-cols-2 gap-6">
+            <a href="{% url 'course_catalog' %}" class="group relative overflow-hidden rounded-2xl bg-satdark-surface border border-satdark-border h-64 flex flex-col justify-end p-8 transition hover:border-electric/50">
+                <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-electric/25 via-transparent to-transparent"></div>
+                <div class="pointer-events-none absolute -top-10 -right-10 h-56 w-56 rounded-full bg-electric/20 blur-3xl"></div>
+                <i class="fas fa-arrow-right absolute top-8 right-8 text-satdark-muted group-hover:text-electric group-hover:translate-x-1 transition"></i>
+                <div class="relative">
+                    <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-electric/20 text-electric text-2xl mb-4"><i class="fas fa-book-open"></i></span>
+                    <h3 class="text-2xl font-bold text-satdark-text mb-1">課程</h3>
+                    <p class="text-sm text-satdark-muted">探索 {{ total_courses }}+ 堂精選課程</p>
+                </div>
+            </a>
+            <a href="{% url 'course_catalog' %}" class="group relative overflow-hidden rounded-2xl bg-satdark-surface border border-satdark-border h-64 flex flex-col justify-end p-8 transition hover:border-electric/50">
+                <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-400/25 via-transparent to-transparent"></div>
+                <div class="pointer-events-none absolute -top-10 -right-10 h-56 w-56 rounded-full bg-brand-400/20 blur-3xl"></div>
+                <i class="fas fa-arrow-right absolute top-8 right-8 text-satdark-muted group-hover:text-electric group-hover:translate-x-1 transition"></i>
+                <div class="relative">
+                    <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-400/20 text-brand-300 text-2xl mb-4"><i class="fas fa-chalkboard-user"></i></span>
+                    <h3 class="text-2xl font-bold text-satdark-text mb-1">講師</h3>
+                    <p class="text-sm text-satdark-muted">{{ total_teachers }}+ 位業界專家親自授課</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</section>
+
 <!-- ============ 熱門分類 ============ -->
 {% if categories %}
-<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-2 mb-4">
-    <div class="grid grid-cols-3 md:grid-cols-6 gap-3">
-        {% for category in categories|slice:":6" %}
-        <a href="{% url 'course_catalog' %}?cat={{ category.name }}" class="group flex flex-col items-center gap-2 bg-jp-surface border border-jp-border rounded-xl py-5 hover:shadow-md hover:-translate-y-1 transition-all">
-            <span class="h-12 w-12 rounded-xl bg-brand-50 text-jp-primary flex items-center justify-center text-xl group-hover:bg-jp-primary group-hover:text-white transition"><i class="fas fa-folder-open"></i></span>
-            <span class="text-sm font-medium text-jp-text text-center px-1">{{ category.name }}</span>
-        </a>
-        {% endfor %}
+<section class="bg-satdark-bg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-2 mb-4 py-8">
+        <div class="grid grid-cols-3 md:grid-cols-6 gap-3">
+            {% for category in categories|slice:":6" %}
+            <a href="{% url 'course_catalog' %}?cat={{ category.name }}" class="group flex flex-col items-center gap-2 bg-satdark-surface border border-satdark-border rounded-xl py-5 hover:border-electric hover:-translate-y-1 transition-all">
+                <span class="h-12 w-12 rounded-xl bg-black/40 text-electric flex items-center justify-center text-xl group-hover:bg-electric group-hover:text-white transition"><i class="fas fa-folder-open"></i></span>
+                <span class="text-sm font-medium text-satdark-text text-center px-1">{{ category.name }}</span>
+            </a>
+            {% endfor %}
+        </div>
     </div>
 </section>
 {% endif %}
 
 <!-- ============ 信任數字 ============ -->
-<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-jp-surface border border-jp-border rounded-xl p-6 text-center">
-            <div class="text-3xl font-bold text-jp-primary">{{ total_enrollments }}+</div>
-            <div class="text-sm text-jp-muted mt-1">累積購課人次</div>
-        </div>
-        <div class="bg-jp-surface border border-jp-border rounded-xl p-6 text-center">
-            <div class="text-3xl font-bold text-jp-primary">{{ total_students }}+</div>
-            <div class="text-sm text-jp-muted mt-1">累積學員</div>
-        </div>
-        <div class="bg-jp-surface border border-jp-border rounded-xl p-6 text-center">
-            <div class="text-3xl font-bold text-jp-primary">{{ total_teachers }}+</div>
-            <div class="text-sm text-jp-muted mt-1">合作講師</div>
-        </div>
-        <div class="bg-jp-surface border border-jp-border rounded-xl p-6 text-center">
-            <div class="text-3xl font-bold text-jp-primary">{{ avg_all }}<span class="text-lg">/5</span></div>
-            <div class="text-sm text-jp-muted mt-1">平均評價</div>
+<section class="bg-satdark-bg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-satdark-surface border border-satdark-border rounded-xl p-6 text-center">
+                <div class="text-3xl font-bold text-electric">{{ total_enrollments }}+</div>
+                <div class="text-sm text-satdark-muted mt-1">累積購課人次</div>
+            </div>
+            <div class="bg-satdark-surface border border-satdark-border rounded-xl p-6 text-center">
+                <div class="text-3xl font-bold text-electric">{{ total_students }}+</div>
+                <div class="text-sm text-satdark-muted mt-1">累積學員</div>
+            </div>
+            <div class="bg-satdark-surface border border-satdark-border rounded-xl p-6 text-center">
+                <div class="text-3xl font-bold text-electric">{{ total_teachers }}+</div>
+                <div class="text-sm text-satdark-muted mt-1">合作講師</div>
+            </div>
+            <div class="bg-satdark-surface border border-satdark-border rounded-xl p-6 text-center">
+                <div class="text-3xl font-bold text-electric">{{ avg_all }}<span class="text-lg">/5</span></div>
+                <div class="text-sm text-satdark-muted mt-1">平均評價</div>
+            </div>
         </div>
     </div>
 </section>
 
 <!-- ============ 募資中課程 ============ -->
 {% if funding_courses %}
-<section id="funding" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
-        <div>
-            <span class="inline-flex items-center gap-2 text-jp-accent font-medium text-sm mb-2"><i class="fas fa-fire"></i> 集資倒數中</span>
-            <h2 class="text-2xl md:text-3xl font-bold tracking-wide text-jp-text">募資中課程</h2>
-            <p class="text-jp-muted mt-1">搶先支持新課，享最優惠早鳥價</p>
+<section id="funding" class="bg-satdark-bg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
+            <div>
+                <span class="inline-flex items-center gap-2 text-electric font-medium text-sm mb-2"><i class="fas fa-fire"></i> 集資倒數中</span>
+                <h2 class="text-2xl md:text-3xl font-bold tracking-wide text-satdark-text">募資中課程</h2>
+                <p class="text-satdark-muted mt-1">搶先支持新課，享最優惠早鳥價</p>
+            </div>
+            <div class="flex gap-2">
+                <button data-carousel-prev="funding" class="h-10 w-10 rounded-full border border-satdark-border bg-satdark-surface text-satdark-muted hover:bg-electric hover:text-white hover:border-electric transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="上一個"><i class="fas fa-chevron-left"></i></button>
+                <button data-carousel-next="funding" class="h-10 w-10 rounded-full border border-satdark-border bg-satdark-surface text-satdark-muted hover:bg-electric hover:text-white hover:border-electric transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="下一個"><i class="fas fa-chevron-right"></i></button>
+            </div>
         </div>
-        <div class="flex gap-2">
-            <button data-carousel-prev="funding" class="h-10 w-10 rounded-full border border-jp-border bg-jp-surface text-jp-muted hover:bg-jp-primary hover:text-white hover:border-jp-primary transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="上一個"><i class="fas fa-chevron-left"></i></button>
-            <button data-carousel-next="funding" class="h-10 w-10 rounded-full border border-jp-border bg-jp-surface text-jp-muted hover:bg-jp-primary hover:text-white hover:border-jp-primary transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="下一個"><i class="fas fa-chevron-right"></i></button>
+        <div data-carousel="funding" class="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4 -mx-1 px-1 no-scrollbar">
+            {% for course in funding_courses %}
+            {% include 'main/partials/funding_card_dark.html' with card_extra="snap-start shrink-0 w-[300px]" %}
+            {% endfor %}
         </div>
-    </div>
-    <div data-carousel="funding" class="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4 -mx-1 px-1 no-scrollbar">
-        {% for course in funding_courses %}
-        {% include 'main/partials/funding_card.html' with card_extra="snap-start shrink-0 w-[300px]" %}
-        {% endfor %}
     </div>
 </section>
 {% endif %}
 
 <!-- ============ 熱門課程 ============ -->
 {% if popular_courses %}
-<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
-        <div>
-            <span class="inline-flex items-center gap-2 text-jp-accent font-medium text-sm mb-2"><i class="fas fa-fire"></i> 學員熱選</span>
-            <h2 class="text-2xl md:text-3xl font-bold tracking-wide text-jp-text">熱門課程</h2>
-            <p class="text-jp-muted mt-1">最多人購買的精選課程</p>
-        </div>
-        <div class="flex items-center gap-3">
-            <a href="{% url 'course_catalog' %}?sort=popular" class="text-jp-primary hover:underline font-medium text-sm">查看全部</a>
-            <div class="flex gap-2">
-                <button data-carousel-prev="popular" class="h-10 w-10 rounded-full border border-jp-border bg-jp-surface text-jp-muted hover:bg-jp-primary hover:text-white hover:border-jp-primary transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="上一個"><i class="fas fa-chevron-left"></i></button>
-                <button data-carousel-next="popular" class="h-10 w-10 rounded-full border border-jp-border bg-jp-surface text-jp-muted hover:bg-jp-primary hover:text-white hover:border-jp-primary transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="下一個"><i class="fas fa-chevron-right"></i></button>
+<section class="bg-satdark-bg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
+            <div>
+                <span class="inline-flex items-center gap-2 text-electric font-medium text-sm mb-2"><i class="fas fa-fire"></i> 學員熱選</span>
+                <h2 class="text-2xl md:text-3xl font-bold tracking-wide text-satdark-text">熱門課程</h2>
+                <p class="text-satdark-muted mt-1">最多人購買的精選課程</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="{% url 'course_catalog' %}?sort=popular" class="text-electric hover:underline font-medium text-sm">查看全部</a>
+                <div class="flex gap-2">
+                    <button data-carousel-prev="popular" class="h-10 w-10 rounded-full border border-satdark-border bg-satdark-surface text-satdark-muted hover:bg-electric hover:text-white hover:border-electric transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="上一個"><i class="fas fa-chevron-left"></i></button>
+                    <button data-carousel-next="popular" class="h-10 w-10 rounded-full border border-satdark-border bg-satdark-surface text-satdark-muted hover:bg-electric hover:text-white hover:border-electric transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="下一個"><i class="fas fa-chevron-right"></i></button>
+                </div>
             </div>
         </div>
-    </div>
-    <div data-carousel="popular" class="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4 -mx-1 px-1 no-scrollbar">
-        {% for course in popular_courses %}
-        {% include 'main/partials/course_card.html' with card_extra="snap-start shrink-0 w-[300px]" %}
-        {% endfor %}
+        <div data-carousel="popular" class="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4 -mx-1 px-1 no-scrollbar">
+            {% for course in popular_courses %}
+            {% include 'main/partials/course_card_dark.html' with card_extra="snap-start shrink-0 w-[300px]" %}
+            {% endfor %}
+        </div>
     </div>
 </section>
 {% endif %}
 
 <!-- ============ 最新課程 ============ -->
 {% if latest_courses %}
-<section id="latest" class="bg-jp-surface border-y border-jp-border">
+<section id="latest" class="bg-satdark-bg">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
             <div>
-                <span class="inline-flex items-center gap-2 text-jp-primary font-medium text-sm mb-2"><i class="fas fa-sparkles"></i> 新鮮上架</span>
-                <h2 class="text-2xl md:text-3xl font-bold tracking-wide text-jp-text">最新課程</h2>
-                <p class="text-jp-muted mt-1">跟上最新趨勢，第一時間開始學習</p>
+                <span class="inline-flex items-center gap-2 text-electric font-medium text-sm mb-2"><i class="fas fa-sparkles"></i> 新鮮上架</span>
+                <h2 class="text-2xl md:text-3xl font-bold tracking-wide text-satdark-text">最新課程</h2>
+                <p class="text-satdark-muted mt-1">跟上最新趨勢，第一時間開始學習</p>
             </div>
             <div class="flex items-center gap-3">
-                <a href="{% url 'course_catalog' %}?sort=newest" class="text-jp-primary hover:underline font-medium text-sm">查看全部</a>
+                <a href="{% url 'course_catalog' %}?sort=newest" class="text-electric hover:underline font-medium text-sm">查看全部</a>
                 <div class="flex gap-2">
-                    <button data-carousel-prev="latest" class="h-10 w-10 rounded-full border border-jp-border bg-jp-surface text-jp-muted hover:bg-jp-primary hover:text-white hover:border-jp-primary transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="上一個"><i class="fas fa-chevron-left"></i></button>
-                    <button data-carousel-next="latest" class="h-10 w-10 rounded-full border border-jp-border bg-jp-surface text-jp-muted hover:bg-jp-primary hover:text-white hover:border-jp-primary transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="下一個"><i class="fas fa-chevron-right"></i></button>
+                    <button data-carousel-prev="latest" class="h-10 w-10 rounded-full border border-satdark-border bg-satdark-bg text-satdark-muted hover:bg-electric hover:text-white hover:border-electric transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="上一個"><i class="fas fa-chevron-left"></i></button>
+                    <button data-carousel-next="latest" class="h-10 w-10 rounded-full border border-satdark-border bg-satdark-bg text-satdark-muted hover:bg-electric hover:text-white hover:border-electric transition disabled:opacity-40 disabled:cursor-not-allowed" aria-label="下一個"><i class="fas fa-chevron-right"></i></button>
                 </div>
             </div>
         </div>
         <div data-carousel="latest" class="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4 -mx-1 px-1 no-scrollbar">
             {% for course in latest_courses %}
-            {% include 'main/partials/course_card.html' with card_extra="snap-start shrink-0 w-[300px]" %}
+            {% include 'main/partials/course_card_dark.html' with card_extra="snap-start shrink-0 w-[300px]" %}
             {% endfor %}
         </div>
     </div>
@@ -174,74 +211,108 @@
 
 <!-- ============ 主題故事區塊（依分類策展） ============ -->
 {% for section in theme_sections %}
-<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
-        <div>
-            <span class="inline-flex items-center gap-2 text-jp-primary font-medium text-sm mb-2"><i class="fas fa-compass"></i> 主題精選</span>
-            <h2 class="text-2xl md:text-3xl font-bold tracking-wide text-jp-text">{{ section.category.name }}</h2>
-            {% if section.category.description %}<p class="text-jp-muted mt-1">{{ section.category.description }}</p>{% endif %}
-        </div>
-        <a href="{% url 'course_catalog' %}?cat={{ section.category.name }}" class="text-jp-primary hover:underline font-medium text-sm">查看全部</a>
+{% if forloop.first %}
+<!-- 精選主題：滿版背景圖版本 -->
+<section class="relative bg-satdark-bg overflow-hidden">
+    <div class="absolute inset-0">
+        <img src="/media/course_images/160b786c6e4742258a442916e658d0cc.jpg" alt="" class="w-full h-full object-cover opacity-40">
+        <div class="absolute inset-0 bg-gradient-to-r from-satdark-bg via-satdark-bg/85 to-satdark-bg/40"></div>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {% for course in section.courses %}
-        {% include 'main/partials/course_card.html' with card_extra="" %}
-        {% endfor %}
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
+            <div>
+                <span class="inline-flex items-center gap-2 text-electric font-medium text-sm mb-2"><i class="fas fa-compass"></i> 主題精選</span>
+                <h2 class="text-2xl md:text-3xl font-bold tracking-wide text-satdark-text">{{ section.category.name }}</h2>
+                {% if section.category.description %}<p class="text-satdark-muted mt-1 max-w-md">{{ section.category.description }}</p>{% endif %}
+            </div>
+            <a href="{% url 'course_catalog' %}?cat={{ section.category.name }}" class="text-electric hover:underline font-medium text-sm">查看全部</a>
+        </div>
+        <div class="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 -mx-1 px-1 no-scrollbar">
+            {% for course in section.courses %}
+            {% include 'main/partials/course_card_dark.html' with card_extra="snap-start shrink-0 w-[260px] backdrop-blur bg-satdark-surface/90" %}
+            {% endfor %}
+        </div>
     </div>
 </section>
+{% else %}
+<section class="bg-satdark-bg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
+            <div>
+                <span class="inline-flex items-center gap-2 text-electric font-medium text-sm mb-2"><i class="fas fa-compass"></i> 主題精選</span>
+                <h2 class="text-2xl md:text-3xl font-bold tracking-wide text-satdark-text">{{ section.category.name }}</h2>
+                {% if section.category.description %}<p class="text-satdark-muted mt-1">{{ section.category.description }}</p>{% endif %}
+            </div>
+            <a href="{% url 'course_catalog' %}?cat={{ section.category.name }}" class="text-electric hover:underline font-medium text-sm">查看全部</a>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {% for course in section.courses %}
+            {% include 'main/partials/course_card_dark.html' with card_extra="" %}
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
 {% endfor %}
 
 <!-- ============ 查看全部課程 CTA ============ -->
-<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
-    <a href="{% url 'course_catalog' %}" class="block text-center bg-jp-surface border border-jp-border hover:border-jp-primary rounded-xl py-6 font-medium text-jp-text transition">
-        瀏覽完整課程總覽（可搜尋、排序、依分類篩選）<i class="fas fa-arrow-right ml-2"></i>
-    </a>
+<section class="bg-satdark-bg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        <a href="{% url 'course_catalog' %}" class="block text-center bg-satdark-surface border border-satdark-border hover:border-electric rounded-xl py-6 font-medium text-satdark-text transition">
+            瀏覽完整課程總覽（可搜尋、排序、依分類篩選）<i class="fas fa-arrow-right ml-2"></i>
+        </a>
+    </div>
 </section>
 
 <!-- ============ 為什麼選擇 EduFlow ============ -->
-<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-    <div class="text-center max-w-2xl mx-auto mb-12">
-        <h2 class="text-2xl md:text-3xl font-bold tracking-wide text-jp-text mb-3">為什麼選擇 EduFlow？</h2>
-        <p class="text-jp-muted">我們用更好的體驗與制度，陪你把學習變成真正的成長。</p>
-    </div>
-    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="bg-jp-surface border border-jp-border rounded-xl p-6 hover:shadow-md transition">
-            <div class="h-12 w-12 rounded-xl bg-brand-50 text-jp-primary flex items-center justify-center text-xl mb-4"><i class="fas fa-user-check"></i></div>
-            <h3 class="font-medium text-jp-text mb-2">業界專家親授</h3>
-            <p class="text-sm text-jp-muted">每位講師皆通過審核，內容緊貼實務現場。</p>
+<section class="bg-satdark-bg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div class="text-center max-w-2xl mx-auto mb-12">
+            <h2 class="text-2xl md:text-3xl font-bold tracking-wide text-satdark-text mb-3">為什麼選擇 EduFlow？</h2>
+            <p class="text-satdark-muted">我們用更好的體驗與制度，陪你把學習變成真正的成長。</p>
         </div>
-        <div class="bg-jp-surface border border-jp-border rounded-xl p-6 hover:shadow-md transition">
-            <div class="h-12 w-12 rounded-xl bg-brand-50 text-jp-primary flex items-center justify-center text-xl mb-4"><i class="fas fa-infinity"></i></div>
-            <h3 class="font-medium text-jp-text mb-2">永久觀看權限</h3>
-            <p class="text-sm text-jp-muted">一次購買終身回看，隨時複習不受限制。</p>
-        </div>
-        <div class="bg-jp-surface border border-jp-border rounded-xl p-6 hover:shadow-md transition">
-            <div class="h-12 w-12 rounded-xl bg-brand-50 text-jp-primary flex items-center justify-center text-xl mb-4"><i class="fas fa-comments"></i></div>
-            <h3 class="font-medium text-jp-text mb-2">互動問答社群</h3>
-            <p class="text-sm text-jp-muted">課程討論區與同學交流，遇到問題不卡關。</p>
-        </div>
-        <div class="bg-jp-surface border border-jp-border rounded-xl p-6 hover:shadow-md transition">
-            <div class="h-12 w-12 rounded-xl bg-brand-50 text-jp-primary flex items-center justify-center text-xl mb-4"><i class="fas fa-shield-halved"></i></div>
-            <h3 class="font-medium text-jp-text mb-2">安心退款保障</h3>
-            <p class="text-sm text-jp-muted">開課後 7 天內不滿意，可申請退費。</p>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="bg-satdark-surface border border-satdark-border rounded-xl p-6 hover:border-electric/50 transition">
+                <div class="h-12 w-12 rounded-xl bg-black/40 text-electric flex items-center justify-center text-xl mb-4"><i class="fas fa-user-check"></i></div>
+                <h3 class="font-medium text-satdark-text mb-2">業界專家親授</h3>
+                <p class="text-sm text-satdark-muted">每位講師皆通過審核，內容緊貼實務現場。</p>
+            </div>
+            <div class="bg-satdark-surface border border-satdark-border rounded-xl p-6 hover:border-electric/50 transition">
+                <div class="h-12 w-12 rounded-xl bg-black/40 text-electric flex items-center justify-center text-xl mb-4"><i class="fas fa-infinity"></i></div>
+                <h3 class="font-medium text-satdark-text mb-2">永久觀看權限</h3>
+                <p class="text-sm text-satdark-muted">一次購買終身回看，隨時複習不受限制。</p>
+            </div>
+            <div class="bg-satdark-surface border border-satdark-border rounded-xl p-6 hover:border-electric/50 transition">
+                <div class="h-12 w-12 rounded-xl bg-black/40 text-electric flex items-center justify-center text-xl mb-4"><i class="fas fa-comments"></i></div>
+                <h3 class="font-medium text-satdark-text mb-2">互動問答社群</h3>
+                <p class="text-sm text-satdark-muted">課程討論區與同學交流，遇到問題不卡關。</p>
+            </div>
+            <div class="bg-satdark-surface border border-satdark-border rounded-xl p-6 hover:border-electric/50 transition">
+                <div class="h-12 w-12 rounded-xl bg-black/40 text-electric flex items-center justify-center text-xl mb-4"><i class="fas fa-shield-halved"></i></div>
+                <h3 class="font-medium text-satdark-text mb-2">安心退款保障</h3>
+                <p class="text-sm text-satdark-muted">開課後 7 天內不滿意，可申請退費。</p>
+            </div>
         </div>
     </div>
 </section>
 
 <!-- ============ 成為講師 CTA ============ -->
-<section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-    <div class="relative overflow-hidden rounded-2xl bg-jp-primary text-white px-8 py-12 md:p-14">
-        <div class="pointer-events-none absolute -top-16 -right-10 h-64 w-64 rounded-full bg-white/10 blur-2xl"></div>
-        <div class="relative flex flex-col md:flex-row items-center justify-between gap-8">
-            <div class="max-w-xl">
-                <h2 class="text-2xl md:text-3xl font-bold tracking-wide mb-3">把你的專業，變成影響力</h2>
-                <p class="text-white/80">加入 EduFlow 講師行列，打造屬於你的線上課程，觸及成千上萬名學員。</p>
-            </div>
-            <div class="flex gap-3 shrink-0">
-                <a href="{% url 'register' %}" class="bg-white text-jp-primary font-medium px-6 py-3 rounded-xl hover:bg-brand-50 transition">立即開課</a>
-                <a href="{% url 'course_catalog' %}" class="bg-white/10 backdrop-blur border border-white/30 text-white font-medium px-6 py-3 rounded-xl hover:bg-white/20 transition">了解更多</a>
+<section class="bg-satdark-bg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div class="relative overflow-hidden rounded-2xl bg-satdark-surface border border-satdark-border text-white px-8 py-12 md:p-14">
+            <div class="pointer-events-none absolute -top-16 -right-10 h-64 w-64 rounded-full bg-electric/20 blur-2xl"></div>
+            <div class="relative flex flex-col md:flex-row items-center justify-between gap-8">
+                <div class="max-w-xl">
+                    <h2 class="text-2xl md:text-3xl font-bold tracking-wide mb-3">把你的專業，變成影響力</h2>
+                    <p class="text-satdark-muted">加入 EduFlow 講師行列，打造屬於你的線上課程，觸及成千上萬名學員。</p>
+                </div>
+                <div class="flex gap-3 shrink-0">
+                    <a href="{% url 'register' %}" class="bg-electric text-white font-medium px-6 py-3 rounded-md hover:bg-electric-hover transition">立即開課</a>
+                    <a href="{% url 'course_catalog' %}" class="bg-white/5 backdrop-blur border border-satdark-border text-white font-medium px-6 py-3 rounded-md hover:bg-white/10 transition">了解更多</a>
+                </div>
             </div>
         </div>
     </div>
 </section>
+</div>
 {% endblock %}
