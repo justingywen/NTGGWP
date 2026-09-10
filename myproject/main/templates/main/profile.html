@@ -3,7 +3,7 @@
 
 {% block content %}
 <main class="max-w-2xl mx-auto px-4 py-10">
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8">
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-8">
     <div class="flex items-center gap-5 mb-6">
       {% if profile.avatar %}
       <img src="{{ profile.avatar.url }}" alt="大頭貼" class="w-[72px] h-[72px] rounded-full object-cover">
@@ -11,27 +11,27 @@
       <span class="w-[72px] h-[72px] rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-white flex items-center justify-center text-3xl font-black">{{ request.user.username|slice:":1"|upper }}</span>
       {% endif %}
       <div>
-        <h1 class="text-2xl font-black text-slate-900">{{ request.user.first_name|default:request.user.username }}{% if request.user.last_name %} {{ request.user.last_name }}{% endif %}</h1>
-        <span class="inline-block mt-1 bg-brand-50 text-brand-700 text-xs font-bold px-3 py-1 rounded-full">{{ profile.get_role_display }}</span>
+        <h1 class="text-2xl font-black text-satdark-text">{{ request.user.first_name|default:request.user.username }}{% if request.user.last_name %} {{ request.user.last_name }}{% endif %}</h1>
+        <span class="inline-block mt-1 bg-brand-50 text-jp-primaryHover text-xs font-bold px-3 py-1 rounded-full">{{ profile.get_role_display }}</span>
       </div>
     </div>
 
-    <div class="divide-y divide-slate-100 mb-6">
-      <div class="flex justify-between py-3"><span class="text-slate-500">帳號</span><span class="font-bold text-slate-800">{{ request.user.username }}</span></div>
-      <div class="flex justify-between py-3"><span class="text-slate-500">姓名</span><span class="font-bold text-slate-800">{% if request.user.first_name or request.user.last_name %}{{ request.user.first_name }} {{ request.user.last_name }}{% else %}未設定{% endif %}</span></div>
-      <div class="flex justify-between py-3"><span class="text-slate-500">Email</span><span class="font-bold text-slate-800">{{ request.user.email }}</span></div>
-      <div class="flex justify-between py-3"><span class="text-slate-500">身分</span><span class="font-bold text-slate-800">{{ profile.get_role_display }}</span></div>
+    <div class="divide-y divide-satdark-border mb-6">
+      <div class="flex justify-between py-3"><span class="text-satdark-muted">帳號</span><span class="font-bold text-satdark-text">{{ request.user.username }}</span></div>
+      <div class="flex justify-between py-3"><span class="text-satdark-muted">姓名</span><span class="font-bold text-satdark-text">{% if request.user.first_name or request.user.last_name %}{{ request.user.first_name }} {{ request.user.last_name }}{% else %}未設定{% endif %}</span></div>
+      <div class="flex justify-between py-3"><span class="text-satdark-muted">Email</span><span class="font-bold text-satdark-text">{{ request.user.email }}</span></div>
+      <div class="flex justify-between py-3"><span class="text-satdark-muted">身分</span><span class="font-bold text-satdark-text">{{ profile.get_role_display }}</span></div>
     </div>
 
     <div class="flex gap-3 flex-wrap">
-      <a href="{% url 'edit_profile' %}" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-5 py-2.5 rounded-lg transition">編輯個人資料</a>
-      <a href="{% url 'my_courses' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">我的課程</a>
+      <a href="{% url 'edit_profile' %}" class="bg-jp-primary hover:bg-jp-primaryHover text-white font-bold px-5 py-2.5 rounded-lg transition">編輯個人資料</a>
+      <a href="{% url 'my_courses' %}" class="bg-white/10 hover:bg-white/20 text-satdark-text font-bold px-5 py-2.5 rounded-lg transition">我的課程</a>
       {% if profile.role == 'teacher' %}
-      <a href="{% url 'teacher_dashboard' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">教師專區</a>
+      <a href="{% url 'teacher_dashboard' %}" class="bg-white/10 hover:bg-white/20 text-satdark-text font-bold px-5 py-2.5 rounded-lg transition">教師專區</a>
       {% else %}
-      <a href="{% url 'student_dashboard' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">學生專區</a>
+      <a href="{% url 'student_dashboard' %}" class="bg-white/10 hover:bg-white/20 text-satdark-text font-bold px-5 py-2.5 rounded-lg transition">學生專區</a>
       {% endif %}
-      <a href="{% url 'home' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">回首頁</a>
+      <a href="{% url 'home' %}" class="bg-white/10 hover:bg-white/20 text-satdark-text font-bold px-5 py-2.5 rounded-lg transition">回首頁</a>
     </div>
   </div>
 </main>

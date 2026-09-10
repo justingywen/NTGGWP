@@ -4,34 +4,34 @@
 
 {% block content %}
 <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7 mb-6">
-    <h1 class="text-2xl font-black text-slate-900 mb-1">學生學習分析</h1>
-    <p class="text-slate-500 mb-5">依你的學習紀錄即時產生觀看時數與課程圖表。</p>
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-7 mb-6">
+    <h1 class="text-2xl font-black text-satdark-text mb-1">學生學習分析</h1>
+    <p class="text-satdark-muted mb-5">依你的學習紀錄即時產生觀看時數與課程圖表。</p>
     <div class="grid sm:grid-cols-2 gap-4">
-      <div class="bg-slate-50 rounded-xl p-5"><h3 class="text-sm text-slate-500 mb-1">已購課程數</h3><div class="text-3xl font-black text-brand-700">{{ purchased_count }}</div></div>
-      <div class="bg-slate-50 rounded-xl p-5"><h3 class="text-sm text-slate-500 mb-1">累積觀看分鐘</h3><div class="text-3xl font-black text-brand-700">{{ total_minutes }}</div></div>
+      <div class="bg-white/5 rounded-xl p-5"><h3 class="text-sm text-satdark-muted mb-1">已購課程數</h3><div class="text-3xl font-black text-jp-primaryHover">{{ purchased_count }}</div></div>
+      <div class="bg-white/5 rounded-xl p-5"><h3 class="text-sm text-satdark-muted mb-1">累積觀看分鐘</h3><div class="text-3xl font-black text-jp-primaryHover">{{ total_minutes }}</div></div>
     </div>
   </div>
 
   <div class="grid md:grid-cols-2 gap-6 mb-6">
-    <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-6"><h2 class="font-black text-slate-900 mb-4">每門課觀看時數</h2><div class="relative h-72"><canvas id="barChart"></canvas></div></div>
-    <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-6"><h2 class="font-black text-slate-900 mb-4">觀看比例</h2><div class="relative h-72"><canvas id="pieChart"></canvas></div></div>
+    <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-6"><h2 class="font-black text-satdark-text mb-4">每門課觀看時數</h2><div class="relative h-72"><canvas id="barChart"></canvas></div></div>
+    <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-6"><h2 class="font-black text-satdark-text mb-4">觀看比例</h2><div class="relative h-72"><canvas id="pieChart"></canvas></div></div>
   </div>
 
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7">
-    <h2 class="font-black text-slate-900 mb-4">最近學習紀錄</h2>
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-7">
+    <h2 class="font-black text-satdark-text mb-4">最近學習紀錄</h2>
     {% if recent_records %}
-    <div class="divide-y divide-slate-100">
+    <div class="divide-y divide-satdark-border">
       {% for record in recent_records %}
       <div class="py-3.5">
-        <strong class="text-slate-800">{{ record.course.title }}</strong>
-        {% if record.lesson %}<span class="text-slate-500"> ・ {{ record.lesson.title }}</span>{% endif %}
-        <div class="text-sm text-slate-500">觀看 {{ record.minutes }} 分鐘 ・ {{ record.watched_at|date:"Y-m-d H:i" }}</div>
+        <strong class="text-satdark-text">{{ record.course.title }}</strong>
+        {% if record.lesson %}<span class="text-satdark-muted"> ・ {{ record.lesson.title }}</span>{% endif %}
+        <div class="text-sm text-satdark-muted">觀看 {{ record.minutes }} 分鐘 ・ {{ record.watched_at|date:"Y-m-d H:i" }}</div>
       </div>
       {% endfor %}
     </div>
-    {% else %}<p class="text-slate-500">目前尚無學習紀錄。</p>{% endif %}
-    <a href="{% url 'student_dashboard' %}" class="inline-block mt-5 text-brand-600 hover:underline font-medium">← 回學生專區</a>
+    {% else %}<p class="text-satdark-muted">目前尚無學習紀錄。</p>{% endif %}
+    <a href="{% url 'student_dashboard' %}" class="inline-block mt-5 text-jp-primary hover:underline font-medium">← 回學生專區</a>
   </div>
 </main>
 {% endblock %}

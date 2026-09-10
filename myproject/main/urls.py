@@ -114,4 +114,14 @@ urlpatterns = [
     path('password-reset/done/', auth_views.PasswordResetDoneView.as_view(
         template_name='main/password_reset_done.html'
     ), name='password_reset_done'),
+
+    # 少了這兩個，PasswordResetView 在產生信件內容時 reverse
+    # 'password_reset_confirm' 會 NoReverseMatch，整個流程一送出就 500。
+    path('password-reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(
+        template_name='main/password_reset_confirm.html'
+    ), name='password_reset_confirm'),
+
+    path('password-reset/complete/', auth_views.PasswordResetCompleteView.as_view(
+        template_name='main/password_reset_complete.html'
+    ), name='password_reset_complete'),
 ]

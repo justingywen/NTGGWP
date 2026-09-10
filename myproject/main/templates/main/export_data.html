@@ -5,43 +5,43 @@
 <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
   <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
     <div></div>
-    <a href="{% url 'platform_analytics' %}" class="text-brand-600 hover:underline font-medium text-sm">← 查看平台內建數據分析儀表板</a>
+    <a href="{% url 'platform_analytics' %}" class="text-jp-primary hover:underline font-medium text-sm">← 查看平台內建數據分析儀表板</a>
   </div>
 
-  <div class="bg-brand-50 rounded-2xl p-5 mb-6 text-sm text-slate-700 leading-relaxed">
-    <strong class="text-brand-700">如何連接 Power BI Desktop：</strong>
+  <div class="bg-brand-50 rounded-2xl p-5 mb-6 text-sm text-satdark-text leading-relaxed">
+    <strong class="text-jp-primaryHover">如何連接 Power BI Desktop：</strong>
     下載所需 CSV 後，開啟 Power BI Desktop →「取得資料」→「文字/CSV」→ 選擇下載的檔案匯入 → 依需求建立關聯與報表。
     CSV 已使用 UTF-8 BOM 編碼，中文欄位可正常顯示。
   </div>
 
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7">
-    <h1 class="text-2xl font-black text-slate-900 mb-1">Power BI 資料匯出</h1>
-    <p class="text-slate-500 mb-6">匯出平台資料表供 Power BI Desktop 建立視覺化報表，建議依序下載所有 CSV 再匯入。</p>
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-7">
+    <h1 class="text-2xl font-black text-satdark-text mb-1">Power BI 資料匯出</h1>
+    <p class="text-satdark-muted mb-6">匯出平台資料表供 Power BI Desktop 建立視覺化報表，建議依序下載所有 CSV 再匯入。</p>
 
     {% for group_title, exports in export_groups %}
-    <h2 class="text-lg font-black text-slate-800 border-t border-slate-100 pt-5 mt-2 mb-4">{{ group_title }}</h2>
+    <h2 class="text-lg font-black text-satdark-text border-t border-satdark-border pt-5 mt-2 mb-4">{{ group_title }}</h2>
     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
       {% for name, desc, url in exports %}
-      <div class="bg-slate-50 rounded-xl p-4">
-        <h3 class="font-bold text-slate-800 text-sm mb-1">{{ name }}</h3>
-        <p class="text-slate-500 text-xs leading-relaxed mb-3">{{ desc }}</p>
-        <a href="{{ url }}" class="inline-block bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 py-1.5 rounded-lg text-sm transition">下載</a>
+      <div class="bg-white/5 rounded-xl p-4">
+        <h3 class="font-bold text-satdark-text text-sm mb-1">{{ name }}</h3>
+        <p class="text-satdark-muted text-xs leading-relaxed mb-3">{{ desc }}</p>
+        <a href="{{ url }}" class="inline-block bg-jp-primary hover:bg-jp-primaryHover text-white font-bold px-4 py-1.5 rounded-lg text-sm transition">下載</a>
       </div>
       {% endfor %}
     </div>
     {% empty %}
     <!-- 若 view 未提供 export_groups，退回列出所有匯出連結 -->
     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <a href="{% url 'export_courses_csv' %}" class="bg-slate-50 hover:bg-slate-100 rounded-xl p-4 font-bold text-slate-800 transition">課程 courses.csv</a>
-      <a href="{% url 'export_enrollments_csv' %}" class="bg-slate-50 hover:bg-slate-100 rounded-xl p-4 font-bold text-slate-800 transition">購課 enrollments.csv</a>
-      <a href="{% url 'export_learning_records_csv' %}" class="bg-slate-50 hover:bg-slate-100 rounded-xl p-4 font-bold text-slate-800 transition">學習 learning_records.csv</a>
-      <a href="{% url 'export_profiles_csv' %}" class="bg-slate-50 hover:bg-slate-100 rounded-xl p-4 font-bold text-slate-800 transition">角色 profiles.csv</a>
-      <a href="{% url 'export_orders_csv' %}" class="bg-slate-50 hover:bg-slate-100 rounded-xl p-4 font-bold text-slate-800 transition">訂單 orders.csv</a>
-      <a href="{% url 'export_order_items_csv' %}" class="bg-slate-50 hover:bg-slate-100 rounded-xl p-4 font-bold text-slate-800 transition">訂單明細 order_items.csv</a>
-      <a href="{% url 'export_payments_csv' %}" class="bg-slate-50 hover:bg-slate-100 rounded-xl p-4 font-bold text-slate-800 transition">付款 payments.csv</a>
-      <a href="{% url 'export_coupon_usage_csv' %}" class="bg-slate-50 hover:bg-slate-100 rounded-xl p-4 font-bold text-slate-800 transition">優惠券使用 coupon_usage.csv</a>
-      <a href="{% url 'export_reviews_csv' %}" class="bg-slate-50 hover:bg-slate-100 rounded-xl p-4 font-bold text-slate-800 transition">評價 reviews.csv</a>
-      <a href="{% url 'export_course_lessons_csv' %}" class="bg-slate-50 hover:bg-slate-100 rounded-xl p-4 font-bold text-slate-800 transition">單元 course_lessons.csv</a>
+      <a href="{% url 'export_courses_csv' %}" class="bg-white/5 hover:bg-white/10 rounded-xl p-4 font-bold text-satdark-text transition">課程 courses.csv</a>
+      <a href="{% url 'export_enrollments_csv' %}" class="bg-white/5 hover:bg-white/10 rounded-xl p-4 font-bold text-satdark-text transition">購課 enrollments.csv</a>
+      <a href="{% url 'export_learning_records_csv' %}" class="bg-white/5 hover:bg-white/10 rounded-xl p-4 font-bold text-satdark-text transition">學習 learning_records.csv</a>
+      <a href="{% url 'export_profiles_csv' %}" class="bg-white/5 hover:bg-white/10 rounded-xl p-4 font-bold text-satdark-text transition">角色 profiles.csv</a>
+      <a href="{% url 'export_orders_csv' %}" class="bg-white/5 hover:bg-white/10 rounded-xl p-4 font-bold text-satdark-text transition">訂單 orders.csv</a>
+      <a href="{% url 'export_order_items_csv' %}" class="bg-white/5 hover:bg-white/10 rounded-xl p-4 font-bold text-satdark-text transition">訂單明細 order_items.csv</a>
+      <a href="{% url 'export_payments_csv' %}" class="bg-white/5 hover:bg-white/10 rounded-xl p-4 font-bold text-satdark-text transition">付款 payments.csv</a>
+      <a href="{% url 'export_coupon_usage_csv' %}" class="bg-white/5 hover:bg-white/10 rounded-xl p-4 font-bold text-satdark-text transition">優惠券使用 coupon_usage.csv</a>
+      <a href="{% url 'export_reviews_csv' %}" class="bg-white/5 hover:bg-white/10 rounded-xl p-4 font-bold text-satdark-text transition">評價 reviews.csv</a>
+      <a href="{% url 'export_course_lessons_csv' %}" class="bg-white/5 hover:bg-white/10 rounded-xl p-4 font-bold text-satdark-text transition">單元 course_lessons.csv</a>
     </div>
     {% endfor %}
   </div>

@@ -3,14 +3,14 @@
 
 {% block content %}
 <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 ef-form">
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-6 mb-5">
-    <h1 class="text-2xl font-black text-slate-900 mb-1">課程內容管理：{{ course.title }}</h1>
-    <a href="{% url 'teacher_dashboard' %}" class="text-brand-600 hover:underline font-medium">← 回教師專區</a>
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-6 mb-5">
+    <h1 class="text-2xl font-black text-satdark-text mb-1">課程內容管理：{{ course.title }}</h1>
+    <a href="{% url 'teacher_dashboard' %}" class="text-jp-primary hover:underline font-medium">← 回教師專區</a>
   </div>
 
   <!-- 新增章節 -->
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-6 mb-5">
-    <h2 class="text-lg font-black text-slate-900 mb-3">新增章節</h2>
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-6 mb-5">
+    <h2 class="text-lg font-black text-satdark-text mb-3">新增章節</h2>
     <form method="post" action="{% url 'add_chapter' course.id %}">
       {% csrf_token %}
       <div class="flex gap-3 flex-wrap items-end">
@@ -18,42 +18,42 @@
         <div class="w-24">{{ chapter_form.sort_order.label }}{{ chapter_form.sort_order }}</div>
       </div>
       <div>{{ chapter_form.description.label }}{{ chapter_form.description }}</div>
-      <button type="submit" class="mt-3 bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition">＋ 新增章節</button>
+      <button type="submit" class="mt-3 bg-jp-primary hover:bg-jp-primaryHover text-white font-bold px-4 py-2 rounded-lg text-sm transition">＋ 新增章節</button>
     </form>
   </div>
 
   {% for chapter in chapters %}
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-6 mb-5">
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-6 mb-5">
     <div class="flex items-center justify-between gap-3 flex-wrap mb-2">
-      <div class="font-black text-slate-900">第 {{ chapter.sort_order }} 章：{{ chapter.title }}</div>
+      <div class="font-black text-satdark-text">第 {{ chapter.sort_order }} 章：{{ chapter.title }}</div>
       <div class="flex gap-2">
-        <a href="{% url 'edit_chapter' chapter.id %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-lg text-sm transition">編輯</a>
+        <a href="{% url 'edit_chapter' chapter.id %}" class="bg-white/10 hover:bg-white/20 text-satdark-text font-bold px-3 py-1.5 rounded-lg text-sm transition">編輯</a>
         <form method="post" action="{% url 'delete_chapter' chapter.id %}" class="inline" onsubmit="return confirm('確定刪除此章節與其單元？');">
-          {% csrf_token %}<button type="submit" class="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-1.5 rounded-lg text-sm transition">刪除</button>
+          {% csrf_token %}<button type="submit" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-3 py-1.5 rounded-lg text-sm transition">刪除</button>
         </form>
       </div>
     </div>
-    {% if chapter.description %}<p class="text-sm text-slate-500 mb-2">{{ chapter.description }}</p>{% endif %}
+    {% if chapter.description %}<p class="text-sm text-satdark-muted mb-2">{{ chapter.description }}</p>{% endif %}
 
     {% for lesson in chapter.lessons.all %}
-    <div class="flex items-center justify-between gap-3 flex-wrap bg-slate-50 rounded-lg px-3 py-2.5 mt-2">
+    <div class="flex items-center justify-between gap-3 flex-wrap bg-white/5 rounded-lg px-3 py-2.5 mt-2">
       <div class="text-sm">
-        <strong class="text-slate-800">{{ chapter.sort_order }}-{{ lesson.sort_order }} {{ lesson.title }}</strong>
-        <span class="text-slate-400">（{{ lesson.duration_minutes }} 分{% if lesson.is_free_preview %}・免費試看{% endif %}）</span>
-        {% if lesson.video_file %}<span class="text-green-600 font-bold text-xs ml-1">🎬 已上傳影片</span>{% elif lesson.video_url %}<span class="text-brand-600 font-bold text-xs ml-1">🔗 影片連結</span>{% endif %}
+        <strong class="text-satdark-text">{{ chapter.sort_order }}-{{ lesson.sort_order }} {{ lesson.title }}</strong>
+        <span class="text-satdark-muted">（{{ lesson.duration_minutes }} 分{% if lesson.is_free_preview %}・免費試看{% endif %}）</span>
+        {% if lesson.video_file %}<span class="text-green-400 font-bold text-xs ml-1">🎬 已上傳影片</span>{% elif lesson.video_url %}<span class="text-jp-primary font-bold text-xs ml-1">🔗 影片連結</span>{% endif %}
       </div>
       <div class="flex gap-2">
-        <a href="{% url 'edit_lesson' lesson.id %}" class="bg-white ring-1 ring-slate-200 hover:ring-brand-300 text-slate-700 font-bold px-3 py-1.5 rounded-lg text-sm transition">編輯</a>
+        <a href="{% url 'edit_lesson' lesson.id %}" class="bg-satdark-surface ring-1 ring-satdark-border hover:ring-brand-300 text-satdark-text font-bold px-3 py-1.5 rounded-lg text-sm transition">編輯</a>
         <form method="post" action="{% url 'delete_lesson' lesson.id %}" class="inline" onsubmit="return confirm('確定刪除此單元？');">
-          {% csrf_token %}<button type="submit" class="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-1.5 rounded-lg text-sm transition">刪除</button>
+          {% csrf_token %}<button type="submit" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-3 py-1.5 rounded-lg text-sm transition">刪除</button>
         </form>
       </div>
     </div>
     {% empty %}
-    <p class="text-sm text-slate-400 mt-2">此章節尚無單元。</p>
+    <p class="text-sm text-satdark-muted mt-2">此章節尚無單元。</p>
     {% endfor %}
 
-    <div class="border-t border-dashed border-slate-200 mt-4 pt-4">
+    <div class="border-t border-dashed border-satdark-border mt-4 pt-4">
       <form method="post" action="{% url 'add_lesson' chapter.id %}" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="flex gap-3 flex-wrap items-end">
@@ -65,37 +65,37 @@
           <div class="w-32">試看{{ lesson_form.is_free_preview }}</div>
         </div>
         <div class="mt-2">或貼影片連結{{ lesson_form.video_url }}</div>
-        <button type="submit" class="mt-3 bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition">＋ 新增單元</button>
+        <button type="submit" class="mt-3 bg-jp-primary hover:bg-jp-primaryHover text-white font-bold px-4 py-2 rounded-lg text-sm transition">＋ 新增單元</button>
       </form>
     </div>
   </div>
   {% empty %}
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8 text-center text-slate-500">尚未建立任何章節，請先於上方新增。</div>
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-8 text-center text-satdark-muted">尚未建立任何章節，請先於上方新增。</div>
   {% endfor %}
 
   <!-- 課程公告 -->
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-6 mt-5">
-    <h2 class="text-lg font-black text-slate-900 mb-3">課程公告</h2>
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-6 mt-5">
+    <h2 class="text-lg font-black text-satdark-text mb-3">課程公告</h2>
     <form method="post" action="{% url 'add_announcement' course.id %}" class="mb-4">
       {% csrf_token %}
       <div>{{ announcement_form.title.label }}{{ announcement_form.title }}</div>
       <div>{{ announcement_form.content.label }}{{ announcement_form.content }}</div>
-      <button type="submit" class="mt-3 bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition">＋ 發布公告</button>
+      <button type="submit" class="mt-3 bg-jp-primary hover:bg-jp-primaryHover text-white font-bold px-4 py-2 rounded-lg text-sm transition">＋ 發布公告</button>
     </form>
-    <div class="divide-y divide-slate-100">
+    <div class="divide-y divide-satdark-border">
       {% for a in announcements %}
       <div class="flex items-start justify-between gap-3 py-3">
         <div>
-          <div class="font-bold text-slate-800">{{ a.title }}</div>
-          <div class="text-xs text-slate-400 mb-1">{{ a.created_at|date:"Y-m-d H:i" }}</div>
-          <div class="text-sm text-slate-600">{{ a.content }}</div>
+          <div class="font-bold text-satdark-text">{{ a.title }}</div>
+          <div class="text-xs text-satdark-muted mb-1">{{ a.created_at|date:"Y-m-d H:i" }}</div>
+          <div class="text-sm text-satdark-muted">{{ a.content }}</div>
         </div>
         <form method="post" action="{% url 'delete_announcement' a.id %}" onsubmit="return confirm('確定刪除此公告？');">
-          {% csrf_token %}<button type="submit" class="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-1.5 rounded-lg text-sm transition shrink-0">刪除</button>
+          {% csrf_token %}<button type="submit" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-3 py-1.5 rounded-lg text-sm transition shrink-0">刪除</button>
         </form>
       </div>
       {% empty %}
-      <p class="text-sm text-slate-400">尚未發布任何公告。</p>
+      <p class="text-sm text-satdark-muted">尚未發布任何公告。</p>
       {% endfor %}
     </div>
   </div>

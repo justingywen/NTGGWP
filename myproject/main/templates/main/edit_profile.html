@@ -3,9 +3,9 @@
 
 {% block content %}
 <main class="max-w-2xl mx-auto px-4 py-10">
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8">
-    <h1 class="text-2xl font-black text-slate-900 mb-1">編輯個人資料</h1>
-    <p class="text-slate-500 mb-6">帳號名稱與身分不可修改，如需更改密碼請使用「忘記密碼」流程。</p>
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-8">
+    <h1 class="text-2xl font-black text-satdark-text mb-1">編輯個人資料</h1>
+    <p class="text-satdark-muted mb-6">帳號名稱與身分不可修改，如需更改密碼請使用「忘記密碼」流程。</p>
 
     <div class="flex items-center gap-5 mb-6">
       {% if profile.avatar %}
@@ -14,8 +14,8 @@
       <span class="w-[72px] h-[72px] rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-white flex items-center justify-center text-3xl font-black">{{ request.user.username|slice:":1"|upper }}</span>
       {% endif %}
       <div>
-        <div class="font-bold text-slate-800">{{ request.user.username }}</div>
-        <span class="inline-block mt-1 bg-brand-50 text-brand-700 text-xs font-bold px-3 py-1 rounded-full">{{ profile.get_role_display }}</span>
+        <div class="font-bold text-satdark-text">{{ request.user.username }}</div>
+        <span class="inline-block mt-1 bg-brand-50 text-jp-primaryHover text-xs font-bold px-3 py-1 rounded-full">{{ profile.get_role_display }}</span>
       </div>
     </div>
 
@@ -23,8 +23,8 @@
       {% csrf_token %}
       {{ form.as_p }}
       <div class="flex gap-3 mt-4">
-        <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-6 py-2.5 rounded-lg transition">儲存變更</button>
-        <a href="{% url 'profile' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-6 py-2.5 rounded-lg transition">取消</a>
+        <button type="submit" class="bg-jp-primary hover:bg-jp-primaryHover text-white font-bold px-6 py-2.5 rounded-lg transition">儲存變更</button>
+        <a href="{% url 'profile' %}" class="bg-white/10 hover:bg-white/20 text-satdark-text font-bold px-6 py-2.5 rounded-lg transition">取消</a>
       </div>
     </form>
   </div>

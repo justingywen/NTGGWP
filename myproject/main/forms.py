@@ -206,7 +206,7 @@ class WithdrawalRequestForm(forms.Form):
         self.min_amount = min_amount
         self.fields['amount'].widget.attrs.update({
             'placeholder': f'最低 NT$ {min_amount}',
-            'class': 'w-full border border-slate-200 rounded-lg py-2.5 px-3 outline-none '
+            'class': 'w-full bg-satdark-surface border border-satdark-border text-satdark-text rounded-lg py-2.5 px-3 outline-none '
                      'focus:border-brand-300 focus:ring-2 focus:ring-brand-200 transition',
         })
 

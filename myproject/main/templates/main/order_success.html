@@ -3,29 +3,29 @@
 
 {% block content %}
 <main class="max-w-lg mx-auto px-4 py-14">
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8 text-center">
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-8 text-center">
     <div class="text-5xl mb-3">🎉</div>
-    <h1 class="text-2xl font-black text-green-600 mb-6">付款完成，購買成功</h1>
+    <h1 class="text-2xl font-black text-green-400 mb-6">付款完成，購買成功</h1>
 
-    <div class="text-left divide-y divide-slate-100 mb-2">
+    <div class="text-left divide-y divide-satdark-border mb-2">
       {% for item in items %}
-      <div class="flex justify-between py-2.5 text-slate-700"><span>{{ item.course.title }}</span><span>NT$ {{ item.price }}</span></div>
+      <div class="flex justify-between py-2.5 text-satdark-text"><span>{{ item.course.title }}</span><span>NT$ {{ item.price }}</span></div>
       {% endfor %}
-      <div class="flex justify-between py-2.5 text-slate-500"><span>原價</span><span>NT$ {{ order.original_price }}</span></div>
-      <div class="flex justify-between py-2.5 text-slate-500"><span>折扣</span><span>− NT$ {{ order.discount_amount }}</span></div>
-      {% if order.coupon %}<div class="flex justify-between py-2.5 text-slate-500"><span>使用優惠券</span><span>{{ order.coupon.code }}</span></div>{% endif %}
+      <div class="flex justify-between py-2.5 text-satdark-muted"><span>原價</span><span>NT$ {{ order.original_price }}</span></div>
+      <div class="flex justify-between py-2.5 text-satdark-muted"><span>折扣</span><span>− NT$ {{ order.discount_amount }}</span></div>
+      {% if order.coupon %}<div class="flex justify-between py-2.5 text-satdark-muted"><span>使用優惠券</span><span>{{ order.coupon.code }}</span></div>{% endif %}
       {% if payment %}
-      <div class="flex justify-between py-2.5 text-slate-500"><span>付款方式</span><span>{{ payment.get_method_display }}</span></div>
-      <div class="flex justify-between py-2.5 text-slate-500"><span>交易編號</span><span class="text-sm">{{ payment.transaction_no }}</span></div>
+      <div class="flex justify-between py-2.5 text-satdark-muted"><span>付款方式</span><span>{{ payment.get_method_display }}</span></div>
+      <div class="flex justify-between py-2.5 text-satdark-muted"><span>交易編號</span><span class="text-sm">{{ payment.transaction_no }}</span></div>
       {% endif %}
-      <div class="flex justify-between py-2.5 text-lg font-black text-brand-700"><span>實付金額</span><span>NT$ {{ order.final_price }}</span></div>
+      <div class="flex justify-between py-2.5 text-lg font-black text-jp-primaryHover"><span>實付金額</span><span>NT$ {{ order.final_price }}</span></div>
     </div>
 
     <div class="flex gap-3 justify-center flex-wrap mt-6">
       {% if order.course %}
       <a href="{% url 'watch_course' order.course.id %}" class="bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-lg transition">▶ 立即開始上課</a>
       {% endif %}
-      <a href="{% url 'my_courses' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-6 py-3 rounded-lg transition">我的課程</a>
+      <a href="{% url 'my_courses' %}" class="bg-white/10 hover:bg-white/20 text-satdark-text font-bold px-6 py-3 rounded-lg transition">我的課程</a>
     </div>
   </div>
 </main>

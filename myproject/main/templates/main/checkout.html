@@ -3,53 +3,53 @@
 
 {% block content %}
 <main class="max-w-2xl mx-auto px-4 py-10">
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8">
-    <h1 class="text-2xl font-black text-slate-900 mb-1">課程結帳</h1>
-    <p class="text-slate-500 mb-6">確認訂單並套用你的優惠券</p>
+  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-8">
+    <h1 class="text-2xl font-black text-satdark-text mb-1">課程結帳</h1>
+    <p class="text-satdark-muted mb-6">確認訂單並套用你的優惠券</p>
 
-    <div class="text-xl font-bold text-slate-900">{{ course.title }}</div>
-    <div class="text-slate-500 mb-5">講師：{{ course.teacher.username }}</div>
+    <div class="text-xl font-bold text-satdark-text">{{ course.title }}</div>
+    <div class="text-satdark-muted mb-5">講師：{{ course.teacher.username }}</div>
 
-    <div class="divide-y divide-slate-100 mb-2">
+    <div class="divide-y divide-satdark-border mb-2">
       {% if list_price != original_price %}
-      <div class="flex justify-between py-3 text-slate-700">
+      <div class="flex justify-between py-3 text-satdark-text">
         <span>課程定價</span>
-        <span><strong class="text-red-500 line-through decoration-2 font-normal mr-2">NT$ {{ list_price }}</strong><strong class="text-red-600">NT$ {{ original_price }}</strong></span>
+        <span><strong class="text-red-400 line-through decoration-2 font-normal mr-2">NT$ {{ list_price }}</strong><strong class="text-red-400">NT$ {{ original_price }}</strong></span>
       </div>
       {% else %}
-      <div class="flex justify-between py-3 text-slate-700"><span>課程原價</span><strong>NT$ {{ original_price }}</strong></div>
+      <div class="flex justify-between py-3 text-satdark-text"><span>課程原價</span><strong>NT$ {{ original_price }}</strong></div>
       {% endif %}
-      <div class="flex justify-between py-3 text-slate-700"><span>優惠券折扣</span><strong>− NT$ {{ discount_amount }}</strong></div>
-      <div class="flex justify-between py-3 text-xl font-black text-brand-700"><span>實付金額</span><span>NT$ {{ final_price }}</span></div>
+      <div class="flex justify-between py-3 text-satdark-text"><span>優惠券折扣</span><strong>− NT$ {{ discount_amount }}</strong></div>
+      <div class="flex justify-between py-3 text-xl font-black text-jp-primaryHover"><span>實付金額</span><span>NT$ {{ final_price }}</span></div>
     </div>
 
-    <div class="bg-slate-50 rounded-xl p-5 mt-5">
+    <div class="bg-white/5 rounded-xl p-5 mt-5">
       <form method="post">
         {% csrf_token %}
-        <label for="couponSelect" class="block font-bold text-slate-700 mb-2">選擇優惠券</label>
+        <label for="couponSelect" class="block font-bold text-satdark-text mb-2">選擇優惠券</label>
 
         {% if my_coupons %}
         <select name="coupon_code" id="couponSelect" onchange="onCouponChange()"
-                class="w-full border border-slate-200 rounded-lg py-2.5 px-3 bg-white outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-200 transition appearance-none cursor-pointer">
+                class="w-full border border-satdark-border rounded-lg py-2.5 px-3 bg-satdark-surface outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-200 transition appearance-none cursor-pointer">
           <option value="">不使用優惠券</option>
           {% for uc in my_coupons %}
           <option value="{{ uc.coupon.code }}" {% if selected_code == uc.coupon.code %}selected{% endif %}>{{ uc.coupon.code }}（{{ uc.coupon.name }}）</option>
           {% endfor %}
         </select>
         {% else %}
-        <p class="text-slate-500">目前沒有可用的優惠券。<a href="{% url 'view_cart' %}" class="text-brand-600 hover:underline">前往購物車領取 →</a></p>
+        <p class="text-satdark-muted">目前沒有可用的優惠券。<a href="{% url 'view_cart' %}" class="text-jp-primary hover:underline">前往購物車領取 →</a></p>
         {% endif %}
 
-        {% if success_message %}<div class="text-green-600 font-bold mt-3">{{ success_message }}</div>{% endif %}
-        {% if error_message %}<div class="text-red-600 font-bold mt-3">{{ error_message }}</div>{% endif %}
+        {% if success_message %}<div class="text-green-400 font-bold mt-3">{{ success_message }}</div>{% endif %}
+        {% if error_message %}<div class="text-red-400 font-bold mt-3">{{ error_message }}</div>{% endif %}
 
         <div class="flex gap-3 flex-wrap mt-5">
           {% if my_coupons %}
           <button type="submit" name="action" value="apply" id="applyBtn"
-                  class="bg-accent-500 hover:bg-accent-600 text-white font-bold px-5 py-2.5 rounded-lg transition" style="display:none;">套用優惠券</button>
+                  class="bg-jp-accent hover:bg-accent-600 text-white font-bold px-5 py-2.5 rounded-lg transition" style="display:none;">套用優惠券</button>
           {% endif %}
-          <button type="submit" name="action" value="buy" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-6 py-2.5 rounded-lg transition">前往付款（NT$ {{ final_price }}）</button>
-          <a href="{% url 'course_detail' course.id %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">返回課程</a>
+          <button type="submit" name="action" value="buy" class="bg-jp-primary hover:bg-jp-primaryHover text-white font-bold px-6 py-2.5 rounded-lg transition">前往付款（NT$ {{ final_price }}）</button>
+          <a href="{% url 'course_detail' course.id %}" class="bg-white/10 hover:bg-white/20 text-satdark-text font-bold px-5 py-2.5 rounded-lg transition">返回課程</a>
         </div>
       </form>
     </div>
