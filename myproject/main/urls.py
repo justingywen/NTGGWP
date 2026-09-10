@@ -18,8 +18,6 @@ urlpatterns = [
     path('lesson/<int:lesson_id>/video/', views.stream_lesson_video, name='stream_lesson_video'),
     path('course/<int:course_id>/certificate/', views.certificate, name='certificate'),
     path('teacher/<int:teacher_id>/profile/', views.teacher_profile, name='teacher_profile'),
-    path('course/<int:course_id>/edit/', views.edit_course, name='edit_course'),
-    path('course/<int:course_id>/delete/', views.delete_course, name='delete_course'),
 
     path('student/dashboard/', views.student_dashboard, name='student_dashboard'),
     path('student/analytics/', views.student_analytics, name='student_analytics'),
@@ -56,8 +54,6 @@ urlpatterns = [
     path('profile/', views.profile_view, name='profile'),
     path('profile/edit/', views.edit_profile, name='edit_profile'),
     path('my-courses/', views.my_courses, name='my_courses'),
-
-    path('create-course/', views.create_course, name='create_course'),
 
     # 購物車
     path('cart/', views.view_cart, name='view_cart'),
@@ -118,6 +114,7 @@ urlpatterns = [
     path('withdrawals/export.csv', views.export_my_withdrawals_csv, name='export_my_withdrawals_csv'),
     path('withdrawals/manage/', views.manage_withdrawals, name='manage_withdrawals'),
     path('withdrawals/<int:withdrawal_id>/process/', views.process_withdrawal, name='process_withdrawal'),
+    path('bank-account/', views.edit_bank_account, name='edit_bank_account'),
 
     path('password-reset/', auth_views.PasswordResetView.as_view(
         template_name='main/password_reset.html'

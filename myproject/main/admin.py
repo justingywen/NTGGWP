@@ -37,6 +37,7 @@ from .models import (
     CourseSplitSetting,
     RevenueRecord,
     WithdrawalRequest,
+    TeacherBankAccount,
 )
 
 # ===== 後台品牌 =====
@@ -190,32 +191,6 @@ admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
 
 
-# ===== 課程 =====
-class RevenueShareSliderWidget(forms.NumberInput):
-    """分潤比例拉桿：拖動時即時顯示百分比，平台分潤 = 100 - 教師分潤。"""
-    input_type = 'range'
-
-    def render(self, name, value, attrs=None, renderer=None):
-        attrs = {**(attrs or {}), 'min': 0, 'max': 100, 'step': 5,
-                 'oninput': 'this.nextElementSibling.value = this.value + "% 教師 / " + (100 - this.value) + "% 平台"',
-                 'style': 'width:260px;vertical-align:middle;'}
-        input_html = super().render(name, value, attrs, renderer)
-        display_value = f'{value}% 教師 / {100 - int(value)}% 平台' if value not in (None, '') else '70% 教師 / 30% 平台'
-        return format_html(
-            '{} <output style="font-weight:700;margin-left:10px;">{}</output>',
-            input_html, display_value
-        )
-
-
-class CourseAdminForm(forms.ModelForm):
-    class Meta:
-        model = Course
-        fields = '__all__'
-        widgets = {
-            'teacher_revenue_share': RevenueShareSliderWidget,
-        }
-
-
 @admin.register(CourseCategory)
 class CourseCategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'course_count', 'created_at')
@@ -228,7 +203,6 @@ class CourseCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    form = CourseAdminForm
     list_display = ('title', 'teacher', 'category', 'level', 'price', 'revenue_share_display', 'promo_badge', 'published_badge', 'created_at')
     list_editable = ('price',)
     list_display_links = ('title',)
@@ -253,9 +227,10 @@ class CourseAdmin(admin.ModelAdmin):
         return status_badge('paid' if obj.is_published else 'pending',
                             '已上架' if obj.is_published else '未上架')
 
-    @admin.display(description='分潤（師/平台）')
+    @admin.display(description='分潤（師/公司）')
     def revenue_share_display(self, obj):
-        return f'{obj.teacher_revenue_share}% / {obj.platform_revenue_share()}%'
+        setting = CourseSplitSetting.for_course(obj)
+        return f'{setting.teacher_split_percent}% / {setting.company_split_percent}%'
 
     @admin.display(description='宣傳模式')
     def promo_badge(self, obj):
@@ -489,12 +464,20 @@ class RevenueRecordAdmin(admin.ModelAdmin):
         return False
 
 
+@admin.register(TeacherBankAccount)
+class TeacherBankAccountAdmin(admin.ModelAdmin):
+    list_display = ('teacher', 'bank_name', 'branch_name', 'account_name', 'account_number', 'updated_at')
+    search_fields = ('teacher__username', 'bank_name', 'account_name', 'account_number')
+    autocomplete_fields = ('teacher',)
+
+
 @admin.register(WithdrawalRequest)
 class WithdrawalRequestAdmin(admin.ModelAdmin):
     list_display = ('teacher', 'amount', 'withdrawal_badge', 'requested_at', 'processed_at')
     search_fields = ('teacher__username',)
     list_filter = ('status', 'requested_at')
     autocomplete_fields = ('teacher',)
+    readonly_fields = ('bank_info_snapshot',)
     actions = ['mark_completed', 'mark_rejected']
 
     @admin.display(description='狀態')
@@ -682,7 +665,7 @@ from django.urls import reverse as _reverse
 _CUSTOM_GROUPS = [
     ('📚 課程管理', ['Course', 'CourseCategory', 'CourseChapter', 'CourseLesson', 'CourseAudit', 'CourseBundle', 'CourseAnnouncement']),
     ('🧾 交易管理', ['Order', 'OrderItem', 'Payment', 'Refund', 'Enrollment']),
-    ('💰 分潤與提領', ['CourseSplitSetting', 'RevenueRecord', 'WithdrawalRequest']),
+    ('💰 分潤與提領', ['CourseSplitSetting', 'RevenueRecord', 'WithdrawalRequest', 'TeacherBankAccount']),
     ('🎯 行銷管理', ['Coupon', 'UserCoupon', 'CouponUsage', 'Promotion', 'Cart']),
     ('👥 會員與互動', ['Profile', 'LearningRecord', 'LessonProgress', 'Favorite', 'Review', 'Notification', 'CourseQuestion', 'CourseAnswer', 'CourseComment']),
 ]

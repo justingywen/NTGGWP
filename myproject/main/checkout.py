@@ -7,21 +7,23 @@
 詞彙定義見專案根目錄 `CONTEXT.md`。折扣的疊加順序：
 
     售價  = Course.get_effective_price()   早鳥價或折扣價，二者取一
-    小計  = 售價 − 促銷折扣                 促銷作用於售價
+    小計  = 售價 − 促銷折扣或合購折扣        促銷與合購互斥、只擇一作用於售價
+                                            （合購價本身就是優惠，不重複套用促銷）
     實付  = 小計 − 優惠券折扣               優惠券作用於小計
 
 每層作用於前一層的結果，所以折扣總額結構上不可能超過售價。
 
-對外只有三個入口：
+對外四個入口：
 
-    quote_basket(user, courses, coupon_code)  算錢，回傳 Quote（不寫資料庫）
-    place_order(user, quote)                  成立待付款訂單（原子性、冪等）
-    with_display_price(courses)               批次掛上含促銷的顯示價
+    quote_basket(user, courses, coupon_code, bundle_map)  算錢，回傳 Quote（不寫資料庫）
+    place_order(user, quote)                              成立待付款訂單（原子性、冪等）
+    with_display_price(courses)                           批次掛上含促銷的顯示價
+    validate_bundle_map(courses, bundle_map)               驗證合購組合是否完整出現
 
 `_price_lines` 是 internal seam：純計算、不碰資料庫，供本 module 的測試直接
-打規則用。**不要從 module 外面呼叫它** —— 它不做已購課過濾，也不驗證優惠券。
+打規則用。**不要從 module 外面呼叫它** —— 它不做已購課過濾，也不驗證優惠券或合購完整性。
 
-成立訂單不等於付款完成。開通課程是付款成功後的事，見 views._finalize_paid_order。
+成立訂單不等於付款完成。開通課程是付款成功後的事，見 transitions.fulfill_order。
 """
 from dataclasses import dataclass, field, replace
 
@@ -44,9 +46,10 @@ class QuoteLine:
     course: object
     list_price: int         # Course.price          定價
     unit_price: int         # get_effective_price() 售價
-    promo_discount: int     # 促銷折扣
+    promo_discount: int     # 促銷折扣；命中合購組合時這裡放合購折扣，兩者互斥不疊加
     coupon_discount: int    # 分攤到本項的優惠券折扣
     paid_amount: int        # unit_price − 兩層折扣
+    bundle: object = None   # 命中的合購組合（CourseBundle），沒有就是 None
 
     @property
     def discount_amount(self):
@@ -114,22 +117,47 @@ def _allocate(total, weights):
     return shares
 
 
-def _price_lines(courses, promo_map, coupon):
+def _price_lines(courses, promo_map, coupon, bundle_map=None):
     """純計算報價。internal seam —— 不查資料庫、不過濾已購課、不驗證優惠券。
 
-    courses   : Course 物件序列（可以是未存檔的實例）
-    promo_map : {course_id: Promotion}，呼叫端已篩選過期間
-    coupon    : Coupon 或 None，呼叫端已確認有效
+    courses    : Course 物件序列（可以是未存檔的實例）
+    promo_map  : {course_id: Promotion}，呼叫端已篩選過期間
+    coupon     : Coupon 或 None，呼叫端已確認有效
+    bundle_map : {course_id: CourseBundle}，呼叫端（validate_bundle_map）已確認組合
+                 完整出現在 courses 裡；命中的課程改套用合購折扣、不疊加促銷
+                 （合購價本身就是優惠），沒命中的課程完全不受影響
     """
+    bundle_map = bundle_map or {}
+
+    # 合購折扣：同一組合內按各課程售價比例分攤，沿用同一套 _allocate
+    bundle_groups = {}
+    for course in courses:
+        bundle = bundle_map.get(course.id)
+        if bundle:
+            bundle_groups.setdefault(bundle.id, []).append(course)
+
+    bundle_discount_map = {}  # course_id -> 合購折扣
+    for group_courses in bundle_groups.values():
+        bundle = bundle_map[group_courses[0].id]
+        unit_prices = [c.get_effective_price() for c in group_courses]
+        bundle_discount_total = max(0, sum(unit_prices) - bundle.bundle_price)
+        shares = _allocate(bundle_discount_total, unit_prices)
+        for c, share in zip(group_courses, shares):
+            bundle_discount_map[c.id] = share
+
     raw = []
     for course in courses:
         unit_price = course.get_effective_price()
-        promo = promo_map.get(course.id)
-        promo_discount = promo.discount_for(unit_price) if promo else 0
-        raw.append((course, unit_price, promo_discount))
+        bundle = bundle_map.get(course.id)
+        if bundle:
+            promo_discount = bundle_discount_map[course.id]
+        else:
+            promo = promo_map.get(course.id)
+            promo_discount = promo.discount_for(unit_price) if promo else 0
+        raw.append((course, unit_price, promo_discount, bundle))
 
-    # 優惠券作用於「促銷後的小計」，再按各項促銷後金額比例分攤回去
-    weights = [unit - promo for _, unit, promo in raw]
+    # 優惠券作用於「促銷/合購後的小計」，再按各項促銷後金額比例分攤回去
+    weights = [unit - promo for _, unit, promo, _ in raw]
     promo_subtotal = sum(weights)
     coupon_total = coupon.discount_for(promo_subtotal) if coupon else 0
     shares = _allocate(coupon_total, weights)
@@ -142,8 +170,9 @@ def _price_lines(courses, promo_map, coupon):
             promo_discount=promo_discount,
             coupon_discount=share,
             paid_amount=unit_price - promo_discount - share,
+            bundle=bundle,
         )
-        for (course, unit_price, promo_discount), share in zip(raw, shares)
+        for (course, unit_price, promo_discount, bundle), share in zip(raw, shares)
     ]
 
     applied_coupon_total = sum(line.coupon_discount for line in lines)
@@ -224,21 +253,48 @@ def _unpurchased(user, courses):
     return [course for course in courses if course.id not in purchased_ids]
 
 
+def validate_bundle_map(courses, bundle_map):
+    """只保留「組合所有課程都還在這次報價裡」的項目；不完整的組合（例如其中一堂
+    已購買而被 _unpurchased 濾掉、或使用者自行移除購物車項目）退回個別計價，
+    不是報錯。呼叫端（cart_checkout）可以直接把購物車裡標記的 bundle 原樣傳進來，
+    完整性檢查統一在這裡做一次，不用自己重複判斷。
+    """
+    if not bundle_map:
+        return {}
+
+    course_ids = {c.id for c in courses}
+    groups = {}
+    for cid, bundle in bundle_map.items():
+        if cid in course_ids:
+            groups.setdefault(bundle.id, (bundle, set()))[1].add(cid)
+
+    validated = {}
+    for bundle, present_ids in groups.values():
+        bundle_course_ids = set(bundle.courses.values_list('id', flat=True))
+        if bundle_course_ids and bundle_course_ids == present_ids:
+            for cid in present_ids:
+                validated[cid] = bundle
+    return validated
+
+
 # =========================
 # 對外 interface
 # =========================
 
-def quote_basket(user, courses, coupon_code=''):
+def quote_basket(user, courses, coupon_code='', bundle_map=None):
     """算出這個購物籃要付多少錢。不寫入任何資料。
 
     已購買的課程會被濾掉；全部都買過時回傳空報價（quote.is_empty 為 True）。
     優惠券無效時不套用，原因放在 quote.coupon_error。
+    bundle_map：{course_id: CourseBundle}，呼叫端依購物車項目的 bundle 標記組成，
+    不需要自己檢查組合是否完整——這裡會用 validate_bundle_map 重新驗證一次。
     """
     remaining = _unpurchased(user, courses)
     coupon, coupon_error = _resolve_coupon(coupon_code)
     promo_map = _active_promotion_map(remaining)
+    validated_bundle_map = validate_bundle_map(remaining, bundle_map or {})
 
-    quote = _price_lines(remaining, promo_map, coupon)
+    quote = _price_lines(remaining, promo_map, coupon, bundle_map=validated_bundle_map)
     if coupon_error:
         quote = replace(quote, coupon=None, coupon_error=coupon_error)
     return quote

@@ -54,11 +54,11 @@ from .models import (
     CourseAnnouncement,
     CourseComment,
     WithdrawalRequest,
+    TeacherBankAccount,
 )
 
 from .forms import (
     RegisterForm,
-    CourseForm,
     CouponApplyForm,
     ReviewForm,
     ChapterForm,
@@ -68,6 +68,7 @@ from .forms import (
     ProfileEditForm,
     AnnouncementForm,
     CommentForm,
+    TeacherBankAccountForm,
 )
 
 from .payments import gateway
@@ -394,22 +395,7 @@ def login_view(request):
 
         if user is not None:
             login(request, user)
-
-            if user.is_superuser:
-                return redirect('/admin/')
-
-            try:
-                profile = user.profile
-
-                if profile.role == 'teacher':
-                    return redirect('teacher_dashboard')
-                elif profile.role == 'student':
-                    return redirect('student_dashboard')
-                else:
-                    return redirect('home')
-
-            except Profile.DoesNotExist:
-                return redirect('home')
+            return _post_login_redirect(user)
 
         else:
             error_message = '帳號 / Email 或密碼錯誤。'
@@ -498,33 +484,38 @@ def student_dashboard(request):
 
 @login_required
 def teacher_dashboard(request):
-    try:
-        profile = request.user.profile
-
-        if profile.role != 'teacher':
-            return redirect('home')
-
-    except Profile.DoesNotExist:
+    """教師專區首頁：純財務儀表板（淨收入、可提領餘額、提領申請與紀錄）。
+    課程本身一律由 Admin 後台管理，教師不可自行新增/編輯/刪除課程。"""
+    if not _require_teacher_profile(request):
         return redirect('home')
 
-    # 一次查完所有統計，不再逐課發四次查詢（見 _course_stats_annotations）
-    teacher_courses = Course.objects.filter(
-        teacher=request.user
-    ).select_related('category').annotate(**_course_stats_annotations())
+    error = None
 
-    course_data = [
-        {
-            'course': course,
-            'purchase_count': course.purchase_count,
-            'total_watch_minutes': course.watch_minutes,
-            'total_revenue': course.revenue,
-            'average_rating': round(course.rating, 1) if course.rating else None,
-        }
-        for course in teacher_courses
-    ]
+    if request.method == 'POST':
+        result, error = _submit_withdrawal_request(request)
+        if result == 'need_bank_account':
+            return redirect('edit_bank_account')
+        if result is not None:
+            return redirect('teacher_dashboard')
+
+    totals = RevenueRecord.objects.filter(
+        teacher=request.user, status='confirmed'
+    ).aggregate(
+        gross_amount=Sum('gross_amount'),
+        marketing_cost=Sum('marketing_cost'),
+        teacher_amount=Sum('teacher_amount'),
+    )
+
+    withdrawals = WithdrawalRequest.objects.filter(
+        teacher=request.user
+    ).order_by('-requested_at')[:10]
 
     return render(request, 'main/teacher_dashboard.html', {
-        'course_data': course_data
+        'totals': totals,
+        'available_balance': WithdrawalRequest.available_balance(request.user),
+        'withdrawals': withdrawals,
+        'bank_account': TeacherBankAccount.objects.filter(teacher=request.user).first(),
+        'error': error,
     })
 
 
@@ -832,105 +823,6 @@ def save_progress(request, lesson_id):
     })
 
 
-@login_required
-def create_course(request):
-    try:
-        profile = request.user.profile
-
-        if profile.role != 'teacher':
-            return redirect('home')
-
-    except Profile.DoesNotExist:
-        return redirect('home')
-
-    if request.method == 'POST':
-        form = CourseForm(request.POST, request.FILES)
-
-        if form.is_valid():
-            course = form.save(commit=False)
-            course.teacher = request.user
-            course.is_published = False  # A8：送審前不上架
-            course.save()
-
-            CourseAudit.objects.create(course=course, status='pending')
-
-            Notification.objects.create(
-                user=request.user,
-                title='課程已送審',
-                content=f'你的課程「{course.title}」已送出審核，通過後才會上架。'
-            )
-
-            return redirect('teacher_dashboard')
-
-    else:
-        form = CourseForm()
-
-    return render(request, 'main/create_course.html', {
-        'form': form
-    })
-
-
-@login_required
-def edit_course(request, course_id):
-    try:
-        profile = request.user.profile
-
-        if profile.role != 'teacher':
-            return redirect('home')
-
-    except Profile.DoesNotExist:
-        return redirect('home')
-
-    course = get_object_or_404(
-        Course,
-        id=course_id,
-        teacher=request.user
-    )
-
-    if request.method == 'POST':
-        form = CourseForm(
-            request.POST,
-            request.FILES,
-            instance=course
-        )
-
-        if form.is_valid():
-            form.save()
-            return redirect('teacher_dashboard')
-
-    else:
-        form = CourseForm(instance=course)
-
-    return render(request, 'main/edit_course.html', {
-        'form': form,
-        'course': course
-    })
-
-
-@login_required
-def delete_course(request, course_id):
-    try:
-        profile = request.user.profile
-
-        if profile.role != 'teacher':
-            return redirect('home')
-
-    except Profile.DoesNotExist:
-        return redirect('home')
-
-    course = get_object_or_404(
-        Course,
-        id=course_id,
-        teacher=request.user
-    )
-
-    if request.method == 'POST':
-        course.delete()
-        return redirect('teacher_dashboard')
-
-    return render(request, 'main/delete_course.html', {
-        'course': course
-    })
 
 
 @login_required
@@ -983,7 +875,7 @@ def student_analytics(request):
 def teacher_analytics(request):
     try:
         profile = request.user.profile
-        if profile.role != 'teacher':
+        if not _is_teacher(profile):
             return redirect('home')
     except Profile.DoesNotExist:
         return redirect('home')
@@ -1601,10 +1493,16 @@ def add_to_cart(request, course_id):
 @login_required
 def view_cart(request):
     cart, _ = Cart.objects.get_or_create(user=request.user)
-    items = list(cart.items.select_related('course', 'course__teacher').all())
+    items = list(cart.items.select_related('course', 'course__teacher', 'bundle').all())
     # 顯示價含促銷，才會和結帳實際收的錢一致（批次計算，不逐課查詢）
     with_display_price([item.course for item in items])
-    total = sum(item.course.display_price for item in items)
+
+    display_bundles, loose_items = _group_cart_items_by_bundle(items)
+    total = sum(
+        b['bundle'].bundle_price if b['is_intact']
+        else sum(gi.course.display_price for gi in b['items'])
+        for b in display_bundles
+    ) + sum(item.course.display_price for item in loose_items)
 
     # 優惠券整合進購物車：可領取 + 我的優惠券
     now = timezone.now()
@@ -1620,6 +1518,8 @@ def view_cart(request):
 
     return render(request, 'main/cart.html', {
         'items': items,
+        'display_bundles': display_bundles,
+        'loose_items': loose_items,
         'total': total,
         'available_coupons': available_coupons,
         'claimed_ids': claimed_ids,
@@ -1645,10 +1545,14 @@ def cart_checkout(request):
         return redirect('view_cart')
 
     cart, _ = Cart.objects.get_or_create(user=request.user)
-    courses = [item.course for item in cart.items.select_related('course').all()]
+    cart_items = list(cart.items.select_related('course', 'bundle').all())
+    courses = [item.course for item in cart_items]
+    bundle_map = {item.course_id: item.bundle for item in cart_items if item.bundle_id}
 
-    # 定價與下單一律走 checkout module；已購課過濾、促銷、券分攤都在裡面。
-    quote = quote_basket(request.user, courses, request.POST.get('coupon_code', ''))
+    # 定價與下單一律走 checkout module；已購課過濾、促銷、券分攤、合購折扣都在裡面。
+    quote = quote_basket(
+        request.user, courses, request.POST.get('coupon_code', ''), bundle_map=bundle_map
+    )
     if quote.is_empty:
         return redirect('view_cart')
 
@@ -1863,7 +1767,7 @@ def _require_course_teacher(request, course_id):
     except Profile.DoesNotExist:
         return None, redirect('home')
 
-    if profile.role != 'teacher':
+    if not _is_teacher(profile):
         return None, redirect('home')
 
     course = get_object_or_404(Course, id=course_id, teacher=request.user)
@@ -2020,7 +1924,7 @@ def manage_refunds(request):
             profile = request.user.profile
         except Profile.DoesNotExist:
             return redirect('home')
-        if profile.role != 'teacher':
+        if not _is_teacher(profile):
             return redirect('home')
         refunds = Refund.objects.filter(
             order__course__teacher=request.user
@@ -2182,12 +2086,12 @@ def process_audit(request, audit_id):
 # =========================
 
 def _require_teacher_profile(request):
-    """回傳講師的 Profile；非講師或未設定角色一律回傳 None。"""
+    """回傳講師的 Profile；非講師（role=='teacher' 或 is_teacher 皆算）一律回傳 None。"""
     try:
         profile = request.user.profile
     except Profile.DoesNotExist:
         return None
-    return profile if profile.role == 'teacher' else None
+    return profile if _is_teacher(profile) else None
 
 
 @login_required
@@ -2227,6 +2131,66 @@ def my_revenue(request):
     })
 
 
+def _submit_withdrawal_request(request):
+    """處理提領申請 POST，供 teacher_dashboard 與 my_withdrawals 共用。
+
+    回傳 (result, error)：
+      result == 'need_bank_account'：尚未綁定收款帳戶，呼叫端應導去綁定頁。
+      result 是 WithdrawalRequest 實例：申請成功（已送出通知）。
+      result 為 None：送出失敗，error 帶原因。
+    """
+    bank_account = TeacherBankAccount.objects.filter(teacher=request.user).first()
+    if not bank_account:
+        return 'need_bank_account', None
+
+    amount_raw = request.POST.get('amount', '').strip()
+    try:
+        amount = int(amount_raw)
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        return None, '請輸入正確的提領金額（正整數）。'
+
+    withdrawal = WithdrawalRequest(
+        teacher=request.user, amount=amount, bank_info_snapshot=bank_account.snapshot_text()
+    )
+    try:
+        withdrawal.save()
+    except ValidationError as e:
+        return None, ' '.join(e.messages)
+
+    Notification.objects.create(
+        user=request.user,
+        title='提領申請已送出',
+        content=f'你申請提領的 NT$ {amount} 已送出，等待處理。'
+    )
+    return withdrawal, None
+
+
+@login_required
+def edit_bank_account(request):
+    """講師綁定／修改收款銀行帳戶。"""
+    if not _require_teacher_profile(request):
+        return redirect('home')
+
+    account = TeacherBankAccount.objects.filter(teacher=request.user).first()
+
+    if request.method == 'POST':
+        form = TeacherBankAccountForm(request.POST, instance=account)
+        if form.is_valid():
+            account = form.save(commit=False)
+            account.teacher = request.user
+            account.save()
+            return redirect('teacher_dashboard')
+    else:
+        form = TeacherBankAccountForm(instance=account)
+
+    return render(request, 'main/edit_bank_account.html', {
+        'form': form,
+        'account': account,
+    })
+
+
 @login_required
 def my_withdrawals(request):
     """講師申請提領、查看自己的提領紀錄與目前可提領餘額。"""
@@ -2236,26 +2200,11 @@ def my_withdrawals(request):
     error = None
 
     if request.method == 'POST':
-        amount_raw = request.POST.get('amount', '').strip()
-        try:
-            amount = int(amount_raw)
-            if amount <= 0:
-                raise ValueError
-        except ValueError:
-            error = '請輸入正確的提領金額（正整數）。'
-        else:
-            withdrawal = WithdrawalRequest(teacher=request.user, amount=amount)
-            try:
-                withdrawal.save()
-            except ValidationError as e:
-                error = ' '.join(e.messages)
-            else:
-                Notification.objects.create(
-                    user=request.user,
-                    title='提領申請已送出',
-                    content=f'你申請提領的 NT$ {amount} 已送出，等待處理。'
-                )
-                return redirect('my_withdrawals')
+        result, error = _submit_withdrawal_request(request)
+        if result == 'need_bank_account':
+            return redirect('edit_bank_account')
+        if result is not None:
+            return redirect('my_withdrawals')
 
     withdrawals = WithdrawalRequest.objects.filter(
         teacher=request.user
@@ -2264,6 +2213,7 @@ def my_withdrawals(request):
     return render(request, 'main/my_withdrawals.html', {
         'withdrawals': withdrawals,
         'available_balance': WithdrawalRequest.available_balance(request.user),
+        'bank_account': TeacherBankAccount.objects.filter(teacher=request.user).first(),
         'error': error,
     })
 
@@ -2664,37 +2614,6 @@ def _attach_reviews(courses):
     return courses
 
 
-def _finalize_paid_order(order):
-    """付款成功後：開通課程、標記優惠券、發通知（具冪等性）。"""
-    if order.status == 'paid':
-        return
-    order.status = 'paid'
-    order.save()
-
-    for item in order.items.select_related('course').all():
-        Enrollment.objects.get_or_create(student=order.user, course=item.course)
-
-    if order.coupon:
-        CouponUsage.objects.get_or_create(
-            order=order,
-            defaults={
-                'user': order.user,
-                'coupon': order.coupon,
-                'discount_amount': order.discount_amount,
-            }
-        )
-        UserCoupon.objects.filter(
-            user=order.user, coupon=order.coupon, status='unused'
-        ).update(status='used', used_at=timezone.now())
-
-    titles = '、'.join(i.course.title for i in order.items.all())
-    Notification.objects.create(
-        user=order.user,
-        title='購買成功通知',
-        content=f'你已完成付款並開通課程：{titles}（實付 NT$ {order.final_price}）。'
-    )
-
-
 def _group_cart_items_by_bundle(items):
     """把購物車項目依合購組合分組，回傳 (display_bundles, loose_items)。
     display_bundles 每筆含 bundle/items/is_intact/individual_total。"""
@@ -2739,6 +2658,7 @@ def _post_login_redirect(user):
     return redirect('home')
 
 
+@login_required
 def add_announcement(request, course_id):
     course, redirect_resp = _require_course_teacher(request, course_id)
     if redirect_resp:
@@ -2755,6 +2675,7 @@ def add_announcement(request, course_id):
     return redirect('manage_content', course_id=course.id)
 
 
+@login_required
 def add_bundle_to_cart(request, bundle_id):
     bundle = get_object_or_404(CourseBundle, id=bundle_id, is_active=True)
     courses = list(bundle.courses.all())
@@ -2774,6 +2695,7 @@ def add_bundle_to_cart(request, bundle_id):
     return redirect('view_cart')
 
 
+@login_required
 def add_comment(request, course_id):
     course = get_object_or_404(Course, id=course_id)
 
@@ -2837,6 +2759,7 @@ def course_catalog(request):
     })
 
 
+@login_required
 def delete_announcement(request, announcement_id):
     announcement = get_object_or_404(CourseAnnouncement, id=announcement_id)
     course, redirect_resp = _require_course_teacher(request, announcement.course_id)
@@ -2913,6 +2836,7 @@ def line_oauth_callback(request):
     return _post_login_redirect(user)
 
 
+@login_required
 def teacher_qna(request):
     try:
         profile = request.user.profile

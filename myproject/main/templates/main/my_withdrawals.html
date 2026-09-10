@@ -22,7 +22,11 @@
     <div class="bg-red-50 text-red-600 font-medium px-4 py-3 rounded-lg mb-4">{{ error }}</div>
     {% endif %}
 
-    {% if available_balance > 0 %}
+    {% if not bank_account %}
+    <p class="text-slate-500">
+      尚未綁定收款帳戶，<a href="{% url 'edit_bank_account' %}" class="text-brand-600 hover:underline font-medium">請先綁定收款帳戶</a>才能申請提領。
+    </p>
+    {% elif available_balance > 0 %}
     <form method="post" class="flex gap-3 flex-wrap items-end">
       {% csrf_token %}
       <div class="flex-1 min-w-[180px]">

@@ -2,72 +2,100 @@
 {% block title %}教師專區 | EduFlow{% endblock %}
 
 {% block content %}
-<main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8 mb-6">
-    <h1 class="text-2xl font-black text-slate-900 mb-1">教師專區</h1>
-    <p class="text-slate-500 mb-5">歡迎，{{ request.user.username }}。管理你的課程、內容與銷售數據。</p>
+<main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <div class="flex items-center justify-between flex-wrap gap-3 mb-6">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 mb-1">教師專區</h1>
+      <p class="text-slate-500">歡迎，{{ request.user.username }}。這裡是你的分潤與提領總覽。</p>
+    </div>
     <div class="flex gap-3 flex-wrap">
-      <a href="{% url 'create_course' %}" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-5 py-2.5 rounded-lg transition">＋ 新增課程</a>
       <a href="{% url 'teacher_analytics' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">課程分析圖表</a>
-      <a href="{% url 'my_revenue' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">我的收支</a>
-      <a href="{% url 'my_withdrawals' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">提領申請</a>
+      <a href="{% url 'my_revenue' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">收支明細</a>
     </div>
   </div>
 
-  {% if course_data %}
-  <div class="space-y-5">
-    {% for item in course_data %}
+  <!-- 財務總覽 -->
+  <div class="grid sm:grid-cols-2 gap-4 mb-6">
     <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-6">
-      <div class="flex items-center gap-3 flex-wrap mb-3">
-        <h3 class="text-xl font-black text-slate-900">{{ item.course.title }}</h3>
-        {% if item.course.is_published %}
-        <span class="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full">已上架</span>
-        {% else %}
-        <span class="bg-amber-100 text-amber-700 text-xs font-bold px-3 py-1 rounded-full">審核中／未上架</span>
-        {% endif %}
-        {% if item.course.is_crowdfunding %}
-        <span class="bg-accent-100 text-accent-600 text-xs font-bold px-3 py-1 rounded-full">
-          <i class="fas fa-bullhorn"></i> {% if item.course.is_funding_active %}募資中{% elif item.course.funding_is_goal_met %}募資成功{% else %}募資結束{% endif %}
-        </span>
-        {% endif %}
-      </div>
-      <div class="flex gap-6 flex-wrap text-slate-500 mb-4">
-        <div>
-          價格
-          {% if item.course.has_discount %}
-          <b class="text-red-500 line-through decoration-2 font-normal">NT$ {{ item.course.price }}</b>
-          <b class="text-red-600">NT$ {{ item.course.get_effective_price }}</b>
-          {% else %}
-          <b class="text-slate-800">NT$ {{ item.course.price }}</b>
-          {% endif %}
-        </div>
-        <div>購買 <b class="text-slate-800">{{ item.purchase_count }}</b> 人</div>
-        <div>觀看 <b class="text-slate-800">{{ item.total_watch_minutes }}</b> 分</div>
-        {% if item.average_rating %}<div>評分 <b class="text-amber-500">★ {{ item.average_rating }}</b></div>{% endif %}
-      </div>
-      {% if item.course.is_crowdfunding %}
-      <div class="bg-slate-50 rounded-xl p-4 mb-4">
-        <div class="flex justify-between text-sm mb-1">
-          <span class="font-black {% if item.course.funding_is_goal_met %}text-accent-600{% else %}text-slate-600{% endif %}">{{ item.course.funding_progress_percent }}% 達成</span>
-          <span class="text-slate-400">{{ item.course.funding_backers_count }} / {{ item.course.funding_goal }} 人{% if item.course.is_funding_active %} ・ 剩 {{ item.course.funding_days_left }} 天{% endif %}</span>
-        </div>
-        <div class="h-2 w-full bg-white rounded-full overflow-hidden">
-          <div class="h-full bg-gradient-to-r from-accent-400 to-accent-600 rounded-full" style="width:{{ item.course.funding_progress_percent }}%"></div>
-        </div>
-      </div>
-      {% endif %}
-      <div class="flex gap-2 flex-wrap">
-        <a href="{% url 'manage_content' item.course.id %}" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition">內容管理</a>
-        <a href="{% url 'edit_course' item.course.id %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-sm transition">編輯課程</a>
-        <a href="{% url 'delete_course' item.course.id %}" class="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-4 py-2 rounded-lg text-sm transition">刪除</a>
-      </div>
+      <div class="text-sm text-slate-500 mb-1">累計淨收入（已確認）</div>
+      <div class="text-3xl font-black text-slate-900">NT$ {{ totals.teacher_amount|default:0 }}</div>
     </div>
-    {% endfor %}
+    <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-6">
+      <div class="text-sm text-slate-500 mb-1">目前可提領餘額</div>
+      <div class="text-3xl font-black text-accent-600">NT$ {{ available_balance }}</div>
+    </div>
   </div>
-  {% else %}
-  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-12 text-center text-slate-500">
-    你目前還沒有建立任何課程。<br>點上方「＋ 新增課程」建立你的第一門課。
+
+  <!-- 收款帳戶 -->
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-6 mb-6">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <div class="text-sm text-slate-500 mb-1">收款銀行帳戶</div>
+        {% if bank_account %}
+        <div class="font-bold text-slate-800">{{ bank_account.snapshot_text }}</div>
+        {% else %}
+        <div class="font-bold text-amber-600">尚未綁定收款帳戶，送出提領申請前請先綁定。</div>
+        {% endif %}
+      </div>
+      <a href="{% url 'edit_bank_account' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-sm transition">
+        {% if bank_account %}修改帳戶{% else %}綁定帳戶{% endif %}
+      </a>
+    </div>
   </div>
-  {% endif %}
+
+  <!-- 提領申請 -->
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8 mb-6">
+    <h2 class="text-lg font-black text-slate-900 mb-4">申請提領</h2>
+
+    {% if error %}
+    <div class="bg-red-50 text-red-600 font-medium px-4 py-3 rounded-lg mb-4">{{ error }}</div>
+    {% endif %}
+
+    {% if not bank_account %}
+    <p class="text-slate-500">請先綁定收款帳戶才能申請提領。</p>
+    {% elif available_balance > 0 %}
+    <form method="post" class="flex gap-3 flex-wrap items-end">
+      {% csrf_token %}
+      <div class="flex-1 min-w-[180px]">
+        <label class="block font-bold text-slate-700 mb-2">提領金額</label>
+        <input type="number" name="amount" min="1" max="{{ available_balance }}" required
+               placeholder="最高 NT$ {{ available_balance }}"
+               class="w-full border border-slate-200 rounded-lg py-2.5 px-3 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-200 transition">
+      </div>
+      <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-6 py-2.5 rounded-lg transition">送出申請</button>
+    </form>
+    {% else %}
+    <p class="text-slate-500">目前沒有可提領的餘額。</p>
+    {% endif %}
+  </div>
+
+  <!-- 提領紀錄 -->
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-black text-slate-900">最近提領紀錄</h2>
+      <a href="{% url 'my_withdrawals' %}" class="text-brand-600 hover:underline font-medium text-sm">查看全部 →</a>
+    </div>
+    {% if withdrawals %}
+    <div class="divide-y divide-slate-100">
+      {% for w in withdrawals %}
+      <div class="flex items-center justify-between gap-4 flex-wrap py-4">
+        <div>
+          <div class="font-bold text-slate-800">NT$ {{ w.amount }}</div>
+          <div class="text-sm text-slate-500">
+            申請於 {{ w.requested_at|date:"Y-m-d H:i" }}
+            {% if w.processed_at %} ・ 處理於 {{ w.processed_at|date:"Y-m-d H:i" }}{% endif %}
+          </div>
+        </div>
+        <span class="px-3 py-1 rounded-full text-sm font-bold
+          {% if w.status == 'pending' %}bg-amber-100 text-amber-700
+          {% elif w.status == 'rejected' %}bg-red-50 text-red-600
+          {% else %}bg-green-100 text-green-700{% endif %}">{{ w.get_status_display }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-slate-500">目前沒有提領申請紀錄。</p>
+    {% endif %}
+  </div>
 </main>
 {% endblock %}

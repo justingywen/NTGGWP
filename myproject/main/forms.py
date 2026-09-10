@@ -1,9 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from django.utils.safestring import mark_safe
 from .models import (
-    Course,
-    CourseCategory,
     Review,
     CourseChapter,
     CourseLesson,
@@ -12,134 +9,21 @@ from .models import (
     CourseAnnouncement,
     CourseComment,
     Profile,
+    TeacherBankAccount,
 )
 
 
-class ListTextWidget(forms.TextInput):
-    """可輸入的下拉：附掛 datalist，選現有或直接打新的都行。"""
-    def __init__(self, data_list, list_id, attrs=None):
-        super().__init__(attrs)
-        self._list = data_list
-        self._list_id = list_id
-        self.attrs.update({'list': list_id, 'autocomplete': 'off'})
-
-    def render(self, name, value, attrs=None, renderer=None):
-        text_html = super().render(name, value, attrs=attrs, renderer=renderer)
-        options = ''.join('<option value="%s">' % item for item in self._list)
-        datalist = '<datalist id="%s">%s</datalist>' % (self._list_id, options)
-        return mark_safe(text_html + datalist)
-
-
-class CourseForm(forms.ModelForm):
-    # 單一欄位：整合「選現有分類」與「輸入新分類」
-    category_name = forms.CharField(
-        label='課程分類',
-        max_length=100,
-        help_text='可點選現有分類，或直接輸入新分類（自動建立）',
-    )
-
-    field_order = [
-        'title', 'category_name', 'level', 'description', 'image',
-        'price', 'discount_price',
-        'is_crowdfunding', 'funding_goal', 'funding_start_date', 'funding_end_date', 'early_bird_price',
-    ]
-
+class TeacherBankAccountForm(forms.ModelForm):
     class Meta:
-        model = Course
-        fields = [
-            'title', 'level', 'price', 'description', 'image',
-            'discount_price',
-            'is_crowdfunding', 'funding_goal', 'funding_start_date', 'funding_end_date', 'early_bird_price',
-        ]
+        model = TeacherBankAccount
+        fields = ['bank_name', 'bank_code', 'branch_name', 'account_name', 'account_number']
         labels = {
-            'title': '課程名稱',
-            'level': '課程難度',
-            'price': '原價',
-            'description': '課程介紹',
-            'image': '課程封面',
-            'discount_price': '折扣價（選填）',
-            'is_crowdfunding': '這是一門募資課程',
-            'funding_goal': '募資門檻人數',
-            'funding_start_date': '募資開始時間',
-            'funding_end_date': '募資結束時間',
-            'early_bird_price': '早鳥優惠價（募資期間適用）',
+            'bank_name': '銀行名稱',
+            'bank_code': '銀行代碼（選填）',
+            'branch_name': '分行名稱（選填）',
+            'account_name': '戶名',
+            'account_number': '帳號',
         }
-        help_texts = {
-            'discount_price': '設定後，課程將顯示原價刪除線與折扣價。',
-            'funding_goal': '達到此人數即視為募資成功。',
-            'early_bird_price': '募資期間內購買者適用此價格，需低於原價。',
-        }
-        widgets = {
-            'funding_start_date': forms.DateTimeInput(
-                attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'
-            ),
-            'funding_end_date': forms.DateTimeInput(
-                attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'
-            ),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['funding_start_date'].input_formats = ['%Y-%m-%dT%H:%M']
-        self.fields['funding_end_date'].input_formats = ['%Y-%m-%dT%H:%M']
-        self.fields['funding_goal'].required = False
-        self.fields['funding_start_date'].required = False
-        self.fields['funding_end_date'].required = False
-        self.fields['early_bird_price'].required = False
-        self.fields['discount_price'].required = False
-
-        names = list(
-            CourseCategory.objects.order_by('name').values_list('name', flat=True)
-        )
-        self.fields['category_name'].widget = ListTextWidget(
-            data_list=names,
-            list_id='category_options',
-            attrs={'placeholder': '選擇或輸入分類名稱'}
-        )
-        # 編輯時帶入原本分類
-        if self.instance and self.instance.pk and self.instance.category:
-            self.fields['category_name'].initial = self.instance.category.name
-
-    def clean_category_name(self):
-        name = (self.cleaned_data.get('category_name') or '').strip()
-        if not name:
-            raise forms.ValidationError('請選擇或輸入課程分類。')
-        return name
-
-    def clean(self):
-        cleaned = super().clean()
-        price = cleaned.get('price')
-        discount_price = cleaned.get('discount_price')
-        is_crowdfunding = cleaned.get('is_crowdfunding')
-        funding_goal = cleaned.get('funding_goal')
-        funding_start = cleaned.get('funding_start_date')
-        funding_end = cleaned.get('funding_end_date')
-        early_bird_price = cleaned.get('early_bird_price')
-
-        if discount_price and price and discount_price >= price:
-            self.add_error('discount_price', '折扣價必須低於原價。')
-
-        if is_crowdfunding:
-            if not funding_goal:
-                self.add_error('funding_goal', '募資課程請設定門檻人數（大於 0）。')
-            if not funding_start or not funding_end:
-                self.add_error('funding_end_date', '募資課程請設定募資起訖時間。')
-            elif funding_end <= funding_start:
-                self.add_error('funding_end_date', '募資結束時間必須晚於開始時間。')
-            if early_bird_price and price and early_bird_price >= price:
-                self.add_error('early_bird_price', '早鳥優惠價必須低於原價。')
-
-        return cleaned
-
-    def save(self, commit=True):
-        course = super().save(commit=False)
-        category, _ = CourseCategory.objects.get_or_create(
-            name=self.cleaned_data['category_name']
-        )
-        course.category = category
-        if commit:
-            course.save()
-        return course
 
 
 class ChapterForm(forms.ModelForm):

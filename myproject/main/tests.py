@@ -16,16 +16,17 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core import mail
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, SimpleTestCase, TestCase
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
-from .checkout import _price_lines, place_order, quote_basket
+from .checkout import _price_lines, place_order, quote_basket, validate_bundle_map
 from .models import (
     Cart,
     CartItem,
     Coupon,
     Course,
     CourseAudit,
+    CourseBundle,
     CourseCategory,
     CourseChapter,
     CourseLesson,
@@ -42,6 +43,7 @@ from .models import (
     Refund,
     RevenueRecord,
     Review,
+    TeacherBankAccount,
     WithdrawalRequest,
 )
 from .transitions import (
@@ -783,6 +785,10 @@ class RevenueAndWithdrawalViewTests(BaseFixture):
         super().setUp()
         self.order = self.buy(self.student, self.course)
         self.record = RevenueRecord.objects.get(order_item=self.order.items.get())
+        self.bank_account = TeacherBankAccount.objects.create(
+            teacher=self.teacher, bank_name='測試銀行',
+            account_name='老師', account_number='1234567890',
+        )
 
     def test_non_teacher_cannot_see_my_revenue(self):
         self.client.login(username='student', password='pw')
@@ -1004,3 +1010,174 @@ class RevenueAndWithdrawalCsvExportTests(BaseFixture):
         self.assertTrue(response.content.startswith(bom))
         # 表頭緊接在 BOM 後面，中間不該夾著任何多餘的 BOM。
         self.assertTrue(response.content[len(bom):].startswith(b'record_id,'))
+
+
+class NoLegacyCourseManagementRoutesTests(SimpleTestCase):
+    """課程建立/編輯/刪除一律走 Admin 後台；前台這三個路由必須已經不存在。"""
+
+    def test_legacy_course_management_urls_are_gone(self):
+        with self.assertRaises(NoReverseMatch):
+            reverse('create_course')
+        with self.assertRaises(NoReverseMatch):
+            reverse('edit_course', args=[1])
+        with self.assertRaises(NoReverseMatch):
+            reverse('delete_course', args=[1])
+
+
+class DualIdentityTeacherAccessTests(BaseFixture):
+    """is_teacher=True 但 role 仍是 student 的帳號，應該和 role=='teacher' 一樣能用教師專區。"""
+
+    def setUp(self):
+        super().setUp()
+        self.dual = User.objects.create_user(username='dual', password='pw')
+        Profile.objects.create(user=self.dual, role='student', is_teacher=True)
+        self.dual_course = Course.objects.create(
+            title='雙重身分老師的課', teacher=self.dual, category=self.category,
+            price=800, description='', is_published=True,
+        )
+
+    def test_dual_identity_can_reach_teacher_dashboard(self):
+        self.client.login(username='dual', password='pw')
+        response = self.client.get(reverse('teacher_dashboard'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_dual_identity_can_reach_teacher_analytics(self):
+        self.client.login(username='dual', password='pw')
+        response = self.client.get(reverse('teacher_analytics'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_dual_identity_can_reach_my_revenue(self):
+        self.client.login(username='dual', password='pw')
+        response = self.client.get(reverse('my_revenue'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_dual_identity_can_manage_own_course_content(self):
+        self.client.login(username='dual', password='pw')
+        response = self.client.get(reverse('manage_content', args=[self.dual_course.id]))
+        self.assertEqual(response.status_code, 200)
+
+    def test_dual_identity_can_reach_manage_refunds(self):
+        self.client.login(username='dual', password='pw')
+        response = self.client.get(reverse('manage_refunds'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_plain_student_still_blocked_from_teacher_dashboard(self):
+        self.client.login(username='student', password='pw')
+        response = self.client.get(reverse('teacher_dashboard'))
+        self.assertRedirects(response, reverse('home'))
+
+
+class LoginRedirectTests(BaseFixture):
+    """不論角色，登入後一律回首頁；教師專區只能靠導覽列自己點進去，不是登入自動跳轉。"""
+
+    def test_student_login_redirects_home(self):
+        response = self.client.post(reverse('login'), {'username': 'student', 'password': 'pw'})
+        self.assertRedirects(response, reverse('home'))
+
+    def test_teacher_login_redirects_home(self):
+        response = self.client.post(reverse('login'), {'username': 'teacher', 'password': 'pw'})
+        self.assertRedirects(response, reverse('home'))
+
+    def test_superuser_login_redirects_to_admin(self):
+        response = self.client.post(reverse('login'), {'username': 'admin', 'password': 'pw'})
+        self.assertRedirects(response, '/admin/', fetch_redirect_response=False)
+
+
+class BundleCheckoutTests(BaseFixture):
+    """合購組合：checkout.py 對外的 bundle_map / validate_bundle_map 支援。"""
+
+    def setUp(self):
+        super().setUp()
+        self.course2 = Course.objects.create(
+            title='合購課程二', teacher=self.teacher, category=self.category,
+            price=600, description='', is_published=True,
+        )
+        self.bundle = CourseBundle.objects.create(name='合購包', bundle_price=1200)
+        self.bundle.courses.set([self.course, self.course2])
+
+    def test_quote_basket_applies_bundle_price_when_intact(self):
+        courses = [self.course, self.course2]
+        bundle_map = {self.course.id: self.bundle, self.course2.id: self.bundle}
+
+        quote = quote_basket(self.student, courses, bundle_map=bundle_map)
+
+        self.assertEqual(quote.total, 1200)
+
+    def test_validate_bundle_map_drops_incomplete_bundle(self):
+        # 只買組合裡其中一堂：不完整，退回個別計價，不是報錯。
+        validated = validate_bundle_map([self.course], {self.course.id: self.bundle})
+
+        self.assertEqual(validated, {})
+
+    def test_quote_basket_ignores_incomplete_bundle_and_prices_individually(self):
+        bundle_map = {self.course.id: self.bundle}  # 少了 course2
+
+        quote = quote_basket(self.student, [self.course], bundle_map=bundle_map)
+
+        self.assertEqual(quote.total, self.course.get_effective_price())
+
+    def test_cart_checkout_builds_bundle_map_and_applies_bundle_price(self):
+        cart, _ = Cart.objects.get_or_create(user=self.student)
+        CartItem.objects.create(cart=cart, course=self.course, bundle=self.bundle)
+        CartItem.objects.create(cart=cart, course=self.course2, bundle=self.bundle)
+        self.client.login(username='student', password='pw')
+
+        self.client.post(reverse('cart_checkout'), {})
+
+        order = Order.objects.get(user=self.student)
+        self.assertEqual(order.final_price, 1200)
+
+    def test_cart_checkout_falls_back_to_individual_price_for_broken_bundle(self):
+        # 組合裡的另一堂沒加進購物車：購物車視角看來組合不完整。
+        cart, _ = Cart.objects.get_or_create(user=self.student)
+        CartItem.objects.create(cart=cart, course=self.course, bundle=self.bundle)
+        self.client.login(username='student', password='pw')
+
+        self.client.post(reverse('cart_checkout'), {})
+
+        order = Order.objects.get(user=self.student)
+        self.assertEqual(order.final_price, self.course.get_effective_price())
+
+
+class WithdrawalBankAccountTests(BaseFixture):
+    """提領申請要綁定收款帳戶；申請當下把帳戶資訊存成快照。"""
+
+    def setUp(self):
+        super().setUp()
+        self.order = self.buy(self.student, self.course)
+        self.record = RevenueRecord.objects.get(order_item=self.order.items.get())
+
+    def test_withdrawal_without_bank_account_redirects_to_bind_page(self):
+        self.client.login(username='teacher', password='pw')
+
+        response = self.client.post(
+            reverse('my_withdrawals'), {'amount': self.record.teacher_amount})
+
+        self.assertRedirects(response, reverse('edit_bank_account'))
+        self.assertEqual(WithdrawalRequest.objects.count(), 0)
+
+    def test_withdrawal_snapshots_bank_account_at_request_time(self):
+        bank_account = TeacherBankAccount.objects.create(
+            teacher=self.teacher, bank_name='測試銀行',
+            account_name='老師', account_number='1234567890',
+        )
+        self.client.login(username='teacher', password='pw')
+
+        self.client.post(reverse('my_withdrawals'), {'amount': self.record.teacher_amount})
+
+        withdrawal = WithdrawalRequest.objects.get(teacher=self.teacher)
+        self.assertIn('測試銀行', withdrawal.bank_info_snapshot)
+        self.assertIn('1234567890', withdrawal.bank_info_snapshot)
+
+    def test_teacher_dashboard_accepts_withdrawal_request_inline(self):
+        TeacherBankAccount.objects.create(
+            teacher=self.teacher, bank_name='測試銀行',
+            account_name='老師', account_number='1234567890',
+        )
+        self.client.login(username='teacher', password='pw')
+
+        response = self.client.post(
+            reverse('teacher_dashboard'), {'amount': self.record.teacher_amount})
+
+        self.assertRedirects(response, reverse('teacher_dashboard'))
+        self.assertEqual(WithdrawalRequest.objects.filter(teacher=self.teacher).count(), 1)
