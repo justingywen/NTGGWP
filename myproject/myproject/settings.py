@@ -34,7 +34,17 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+# 本機開發用的兩個永遠保留；正式站網域用環境變數 ALLOWED_HOSTS 加（逗號分隔，
+# 例如 ALLOWED_HOSTS=eduflow.com,www.eduflow.com），不用改程式碼、不用重新部署。
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost'] + [
+    host.strip() for host in os.environ.get('ALLOWED_HOSTS', '').split(',') if host.strip()
+]
+
+# OAuth callback、表單送出這類跨網域回跳，正式站上 HTTPS 網域要加進來才不會被 CSRF 擋下。
+# 例如 CSRF_TRUSTED_ORIGINS=https://eduflow.com,https://www.eduflow.com（要帶 https://，逗號分隔）。
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()
+]
 
 
 # Application definition
