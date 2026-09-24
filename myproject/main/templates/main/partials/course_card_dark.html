@@ -1,4 +1,4 @@
-<article class="{{ card_extra }} bg-satdark-surface rounded-xl overflow-hidden border border-satdark-border hover:-translate-y-1 hover:border-electric/50 transition-all group">
+<article class="{{ card_extra }} bg-satdark-surface rounded-lg overflow-hidden border border-satdark-border hover:-translate-y-1 hover:border-electric hover:shadow-lg hover:shadow-electric/10 transition-all group">
     <a href="{% url 'course_detail' course.id %}" class="block">
         <div class="relative aspect-video overflow-hidden bg-satdark-bg">
             {% if course.image %}
@@ -6,19 +6,29 @@
             {% else %}
             <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-electric to-brand-500 text-white text-4xl font-bold">{{ course.title|slice:":1"|upper }}</div>
             {% endif %}
-            <span class="absolute top-3 left-3 bg-black/60 backdrop-blur text-satdark-text text-xs font-medium px-2.5 py-1 rounded-full">{{ course.get_level_display }}</span>
-            {% if course.is_crowdfunding and course.is_funding_active %}
-            <span class="absolute top-3 right-3 bg-electric/20 text-electric text-xs font-medium px-2.5 py-1 rounded-full"><i class="fas fa-bullhorn mr-1"></i>募資中</span>
+            <span class="absolute top-3 left-3 bg-black/75 text-satdark-text text-xs font-medium px-2 py-1 rounded">{{ course.get_level_display }}</span>
+            {% if course.id in nav_enrolled_ids %}
+            <span class="absolute top-3 left-20 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded"><i class="fas fa-check mr-0.5"></i>已購買</span>
             {% endif %}
+            {% if course.is_crowdfunding and course.is_funding_active %}
+            <span class="absolute top-3 right-3 bg-electric text-black text-xs font-bold px-2 py-1 rounded"><i class="fas fa-bullhorn mr-1"></i>募資中</span>
+            {% endif %}
+            {% if course.student_count %}
+            <span class="absolute bottom-3 right-3 bg-black/70 text-white text-xs px-2 py-1 rounded flex items-center gap-1"><i class="fas fa-users text-[10px]"></i> {{ course.student_count }} 人在學</span>
+            {% endif %}
+
+            <div class="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                <p class="text-white/90 text-xs leading-relaxed line-clamp-2">{{ course.description|truncatechars:80 }}</p>
+            </div>
         </div>
         <div class="p-5">
             {% if course.category %}<p class="text-xs text-electric font-medium mb-1">{{ course.category.name }}</p>{% endif %}
             <h3 class="font-medium text-satdark-text leading-snug mb-2 line-clamp-2 h-11 group-hover:text-electric transition">{{ course.title }}</h3>
-            <p class="text-sm text-satdark-muted mb-3">{{ course.teacher.username }} 老師</p>
+            <p class="text-sm text-satdark-muted mb-3">{{ course.teacher.profile.display_name }} 老師</p>
             <div class="flex items-center gap-1 text-sm mb-3">
                 {% if course.avg_rating %}
                 <span class="text-amber-400"><i class="fas fa-star"></i></span>
-                <span class="font-medium text-satdark-text">{{ course.avg_rating }}</span>
+                <span class="font-grotesk tabular-nums font-medium text-satdark-text">{{ course.avg_rating }}</span>
                 <span class="text-satdark-muted">({{ course.review_count }})</span>
                 {% else %}
                 <span class="text-satdark-muted">尚無評分</span>
@@ -26,10 +36,10 @@
             </div>
             <div class="flex items-baseline gap-2">
                 {% if course.has_discount %}
-                <span class="text-sm text-satdark-muted line-through decoration-2">NT$ {{ course.price }}</span>
-                <span class="text-lg font-bold text-electric">NT$ {{ course.get_effective_price }}</span>
+                <span class="font-grotesk tabular-nums text-sm text-satdark-muted line-through decoration-2">NT$ {{ course.price }}</span>
+                <span class="font-grotesk tabular-nums text-lg font-bold text-electric">NT$ {{ course.get_effective_price }}</span>
                 {% else %}
-                <span class="text-lg font-bold text-electric">NT$ {{ course.price }}</span>
+                <span class="font-grotesk tabular-nums text-lg font-bold text-electric">NT$ {{ course.price }}</span>
                 {% endif %}
             </div>
         </div>

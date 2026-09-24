@@ -11,33 +11,25 @@
             theme: {
                 extend: {
                     colors: {
-                        // brand/accent 是全站按鈕、標籤、價格等元件既有沿用的語意色名，
-                        // 直接改色階數值即可讓全站自動套用新配色，不必逐一模板改 class 名稱。
-                        // 全站改成 sat.cool 風格深色主題後，50/100 這兩階（原本是白底頁面上的
-                        // 淺色底色塊，例如 bg-brand-50 的優惠券標籤）改成深色調的同色系底色，
-                        // 中高階（按鈕、漸層、focus ring）維持原本飽和度，在深色背景上依然醒目。
                         brand: {
-                            50: '#182338', 100: '#1c2a42', 200: '#b9cbdf', 300: '#8fa9c8',
-                            400: '#5f7fa8', 500: '#3d628c', 600: '#2b4c7e', 700: '#1f375c',
-                            800: '#182b47', 900: '#101d30',
+                            50: '#e6fbf6', 100: '#c3f4e9', 200: '#8fe9d6', 300: '#54d8be',
+                            400: '#22c2a5', 500: '#0fa88d', 600: '#0c8f78', 700: '#0b7362',
+                            800: '#0d5b4f', 900: '#0c4a41',
                         },
                         accent: {
-                            50: '#2b2110', 100: '#3a2c14', 300: '#f0b36c',
-                            400: '#e89a44', 500: '#d9822b', 600: '#bd6a1c',
+                            50: '#fff7ed', 100: '#ffedd5', 300: '#fdba74',
+                            400: '#fbbf24', 500: '#f59e0b', 600: '#d97706',
                         },
-                        // 日系設計規範點名的語意色（背景/卡片/邊框/文字）：整站現在統一走深色主題，
-                        // 直接指到 satdark/electric 色階，舊模板既有的 jp-* class 不必逐一改名。
                         jp: {
-                            bg: '#030303',
-                            surface: '#17191c',
-                            border: '#2a2d31',
-                            text: '#ffffff',
-                            muted: '#9a9a9a',
-                            primary: '#005cff',
-                            primaryHover: '#0047c4',
-                            accent: '#005cff',
+                            bg: '#0a0e14',
+                            surface: '#12161f',
+                            border: '#242b38',
+                            text: '#e8ecf8',
+                            muted: '#aab2c7',
+                            primary: '#16c2a3',
+                            primaryHover: '#0fa588',
+                            accent: '#fbbf24',
                         },
-                        // sat.cool 風格深色主題，全站現在統一使用
                         satdark: {
                             bg: '#030303',
                             surface: '#17191c',
@@ -46,11 +38,16 @@
                             muted: '#9a9a9a',
                         },
                         electric: {
-                            DEFAULT: '#005cff',
-                            hover: '#0047c4',
+                            DEFAULT: '#16c2a3',
+                            hover: '#0fa588',
                         },
                     },
-                    fontFamily: { sans: ['"Noto Sans TC"', '"Inter"', 'system-ui', 'sans-serif'] },
+                    fontFamily: {
+                        sans: ['"Noto Sans TC"', '"Inter"', 'system-ui', 'sans-serif'],
+                        display: ['"Fraunces"', '"Noto Sans TC"', 'serif'],
+                        ticket: ['"IBM Plex Mono"', 'monospace'],
+                        grotesk: ['"Hanken Grotesk"', '"Noto Sans TC"', 'sans-serif'],
+                    },
                     keyframes: {
                         'float': { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-12px)' } },
                         'fade-up': { '0%': { opacity: 0, transform: 'translateY(16px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } },
@@ -63,7 +60,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Inter:wght@400;600;800&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@500;600&family=Hanken+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
@@ -80,20 +77,92 @@
             html { scroll-behavior: auto; }
             *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
         }
-        /* Django 表單控制項在 EduFlow 版型的基礎樣式（Tailwind preflight 會 reset） */
+
         .ef-form input:not([type=checkbox]):not([type=radio]):not([type=file]),
         .ef-form select, .ef-form textarea {
-            width: 100%; border: 1px solid #2a2d31; border-radius: 0.6rem;
-            padding: 0.625rem 0.75rem; font-size: 0.95rem; background: #17191c; color: #ffffff;
+            width: 100%; border: 1px solid #2a3242; border-radius: 0.7rem;
+            padding: 0.65rem 0.85rem; font-size: 0.95rem; background: #0f1420; color: #e8ecf8;
+            transition: border-color .15s, box-shadow .15s;
         }
+        .ef-form input::placeholder, .ef-form textarea::placeholder { color: #7c869c; }
         .ef-form input:focus, .ef-form select:focus, .ef-form textarea:focus {
-            outline: none; border-color: #005cff; box-shadow: 0 0 0 3px rgba(0,92,255,.25);
+            outline: none; border-color: #16c2a3; box-shadow: 0 0 0 3px rgba(22,194,163,.20);
         }
-        .ef-form label { font-weight: 600; color: #ffffff; display: block; margin: 0.6rem 0 0.25rem; }
-        .ef-form p { margin-bottom: 0.6rem; }
-        .ef-form ul.errorlist { color: #f87171; font-size: 0.85rem; list-style: none; padding: 0; margin: 0.25rem 0; }
-        .ef-form .helptext { color: #9a9a9a; font-size: 0.8rem; }
-        .ef-form input[type=file] { font-size: 0.9rem; color: #9a9a9a; }
+        .ef-form textarea { resize: vertical; min-height: 6.5rem; }
+        .ef-form label { font-weight: 700; color: #aab2c7; display: block; margin: 0.8rem 0 0.4rem; }
+        .ef-form p { margin-bottom: 0.9rem; }
+        .ef-form ul.errorlist { color: #ff9b9b; font-size: 0.85rem; list-style: none; padding: 0; margin: 0.25rem 0; }
+        .ef-form .helptext { color: #7c869c; font-size: 0.8rem; }
+        .ef-form input[type=file] { font-size: 0.9rem; color: #aab2c7; }
+        .ef-form input[type=checkbox], .ef-form input[type=radio] { accent-color: #16c2a3; width: 1rem; height: 1rem; vertical-align: middle; }
+
+
+        .bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50 {
+            background-color: #12161f !important;
+        }
+        .bg-slate-100, .bg-slate-200, .bg-gray-200 {
+            background-color: #1b2130 !important;
+        }
+        .text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800,
+        .text-slate-700, .text-gray-700 {
+            color: #e8ecf8 !important;
+        }
+        .text-slate-600, .text-gray-600, .text-slate-500, .text-gray-500,
+        .text-slate-400, .text-gray-400 {
+            color: #aab2c7 !important;
+        }
+        .border-slate-100, .border-slate-200, .border-gray-100, .border-gray-200 {
+            border-color: #242b38 !important;
+        }
+
+        .bg-red-50 { background-color: rgba(248,113,113,.12) !important; }
+        .bg-green-50, .bg-emerald-50 { background-color: rgba(52,211,153,.12) !important; }
+        .bg-amber-50, .bg-yellow-50 { background-color: rgba(251,191,36,.12) !important; }
+        .bg-blue-50, .bg-indigo-50 { background-color: rgba(96,165,250,.12) !important; }
+        .bg-rose-50 { background-color: rgba(251,113,133,.12) !important; }
+        .hover\:bg-rose-50:hover { background-color: rgba(251,113,133,.18) !important; }
+        .text-rose-600 { color: #fda4af !important; }
+
+        .bg-brand-50, .bg-brand-100 { background-color: rgba(22,194,163,.14) !important; }
+        .hover\:bg-brand-50:hover, .hover\:bg-brand-100:hover { background-color: rgba(22,194,163,.22) !important; }
+        .text-red-600, .text-red-700 { color: #ff9b9b !important; }
+        .text-green-600, .text-green-700, .text-emerald-700 { color: #6ee7b7 !important; }
+        .text-amber-600, .text-amber-700 { color: #fcd34d !important; }
+        .text-blue-600, .text-blue-700, .text-indigo-600, .text-indigo-700 { color: #93c5fd !important; }
+
+
+        .btn-glass, .btn-glass-primary {
+            position: relative; display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+            border-radius: 0.5rem; font-weight: 700; cursor: pointer;
+            transition: transform .15s ease, background .15s ease, border-color .15s ease;
+        }
+        .btn-glass:hover, .btn-glass-primary:hover { transform: translateY(-1px); }
+        .btn-glass:active, .btn-glass-primary:active { transform: translateY(0); }
+
+        .btn-glass {
+            color: #fff; background: transparent; border: 1px solid rgba(255,255,255,.35);
+        }
+        .btn-glass:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.55); }
+
+        .btn-glass-primary {
+            color: #04110f; background: #16c2a3; border: 1px solid #16c2a3;
+        }
+        .btn-glass-primary:hover { background: #1bd9b7; border-color: #1bd9b7; }
+
+        .glass-arrow {
+            height: 2.75rem; width: 2.75rem; display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 0.5rem; color: #fff; cursor: pointer;
+            border: 1px solid rgba(255,255,255,.25);
+            background: rgba(10,14,20,.75);
+            transition: transform .15s ease, background .15s ease, border-color .15s ease;
+        }
+        .glass-arrow:hover { background: rgba(22,194,163,.25); border-color: #16c2a3; transform: translateY(-1px); }
+        .glass-arrow:active { transform: translateY(0); }
+        .glass-arrow:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+
+
+        .text-tight-head { letter-spacing: -0.02em; }
+        .tabular-nums { font-variant-numeric: tabular-nums; }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -105,14 +174,13 @@
 
     {% include 'main/partials/eduflow_footer.html' %}
 
-    <!-- 回到頂部按鈕 -->
+
     <button data-back-to-top class="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-jp-primary text-white shadow-lg shadow-brand-600/30 hover:bg-jp-primaryHover transition opacity-0 invisible" aria-label="回到頂部">
         <i class="fas fa-arrow-up"></i>
     </button>
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // 可關閉元素（公告列）
         document.querySelectorAll('[data-close]').forEach((btn) => {
             btn.addEventListener('click', () => {
                 const t = document.querySelector(btn.dataset.close);
@@ -120,7 +188,6 @@
             });
         });
 
-        // 導覽列搜尋：點圖示展開/收合搜尋列
         document.querySelectorAll('[data-search-toggle]').forEach((btn) => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('[data-search-panel]').forEach((panel) => {
@@ -133,7 +200,25 @@
             });
         });
 
-        // 手機側邊選單
+        document.querySelectorAll('[data-dropdown-wrapper]').forEach((wrapper) => {
+            const toggle = wrapper.querySelector('[data-dropdown-toggle]');
+            const menu = wrapper.querySelector('[data-dropdown-menu]');
+            const caret = wrapper.querySelector('[data-dropdown-caret]');
+            if (!toggle || !menu) return;
+            const close = () => { menu.classList.add('hidden'); caret && caret.classList.remove('rotate-180'); };
+            const open = () => { menu.classList.remove('hidden'); caret && caret.classList.add('rotate-180'); };
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                menu.classList.contains('hidden') ? open() : close();
+            });
+            document.addEventListener('click', (e) => {
+                if (!wrapper.contains(e.target)) close();
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') close();
+            });
+        });
+
         const mobileMenu = document.querySelector('[data-mobile-menu]');
         const openMobile = () => mobileMenu && mobileMenu.classList.remove('hidden');
         const closeMobile = () => mobileMenu && mobileMenu.classList.add('hidden');
@@ -141,7 +226,6 @@
         document.querySelectorAll('[data-mobile-close]').forEach((b) => b.addEventListener('click', closeMobile));
         mobileMenu && mobileMenu.querySelectorAll('a').forEach((a) => a.addEventListener('click', closeMobile));
 
-        // 橫向輪播
         document.querySelectorAll('[data-carousel]').forEach((track) => {
             const name = track.dataset.carousel;
             const prevBtn = document.querySelector(`[data-carousel-prev="${name}"]`);
@@ -160,7 +244,6 @@
             updateButtons();
         });
 
-        // 捲動：Navbar 陰影 + 回到頂部顯隱
         const navbar = document.getElementById('navbar');
         const backToTop = document.querySelector('[data-back-to-top]');
         const onScroll = () => {

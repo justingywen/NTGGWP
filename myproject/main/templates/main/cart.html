@@ -3,37 +3,37 @@
 
 {% block content %}
 <main class="max-w-3xl mx-auto px-4 py-10">
-  <!-- 購物車明細 -->
-  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-7 mb-6">
-    <h1 class="text-2xl font-black text-satdark-text mb-5">我的購物車</h1>
+
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7 mb-6">
+    <h1 class="text-2xl font-black text-slate-900 mb-5">我的購物車</h1>
     {% if items %}
       {% if display_bundles %}
       <div class="space-y-3 mb-4">
         {% for group in display_bundles %}
-        <div class="border {% if group.is_intact %}border-brand-200 bg-brand-50{% else %}border-amber-500/30 bg-amber-500/10{% endif %} rounded-xl p-4">
+        <div class="border {% if group.is_intact %}border-brand-200 bg-brand-50{% else %}border-amber-200 bg-amber-50{% endif %} rounded-xl p-4">
           <div class="flex items-center justify-between gap-3 flex-wrap mb-2">
-            <span class="font-bold text-satdark-text">🎁 {{ group.bundle.name }}</span>
+            <span class="font-bold text-slate-800">🎁 {{ group.bundle.name }}</span>
             {% if group.is_intact %}
             <span class="text-right">
-              <span class="text-xs text-red-400 line-through decoration-2 mr-1">NT$ {{ group.individual_total }}</span>
-              <span class="text-lg font-black text-red-400">NT$ {{ group.bundle.bundle_price }}</span>
+              <span class="text-xs text-red-500 line-through decoration-2 mr-1">NT$ {{ group.individual_total }}</span>
+              <span class="text-lg font-black text-red-600">NT$ {{ group.bundle.bundle_price }}</span>
             </span>
             {% else %}
-            <span class="text-sm font-bold text-amber-400">此合購組合已不完整，將以個別價格計算</span>
+            <span class="text-sm font-bold text-amber-700">此合購組合已不完整，將以個別價格計算</span>
             {% endif %}
           </div>
-          <div class="divide-y divide-white/10">
+          <div class="divide-y divide-white">
             {% for item in group.items %}
             <div class="flex items-center justify-between gap-4 py-2">
               <div>
-                <div class="font-medium text-satdark-text">{{ item.course.title }}</div>
-                <div class="text-xs text-satdark-muted">講師：{{ item.course.teacher.username }}</div>
+                <div class="font-medium text-slate-700">{{ item.course.title }}</div>
+                <div class="text-xs text-slate-500">講師：{{ item.course.teacher.profile.display_name }}</div>
               </div>
               <div class="flex items-center gap-3">
-                {% if not group.is_intact %}<span class="text-sm text-satdark-muted">NT$ {{ item.course.get_effective_price }}</span>{% endif %}
-                <form method="post" action="{% url 'remove_from_cart' item.id %}">
+                {% if not group.is_intact %}<span class="text-sm text-slate-600">NT$ {{ item.course.get_effective_price }}</span>{% endif %}
+                <form method="post" action="{% url 'remove_from_cart' item.id %}" onsubmit="return confirm('確定從購物車移除這門課程？')">
                   {% csrf_token %}
-                  <button type="submit" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-3 py-1.5 rounded-lg text-xs transition">移除</button>
+                  <button type="submit" class="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-1.5 rounded-lg text-xs transition">移除</button>
                 </form>
               </div>
             </div>
@@ -44,58 +44,58 @@
       </div>
       {% endif %}
 
-      <div class="divide-y divide-satdark-border">
+      <div class="divide-y divide-slate-100">
         {% for item in loose_items %}
         <div class="flex items-center justify-between gap-4 py-4">
           <div>
-            <div class="font-bold text-satdark-text">{{ item.course.title }}</div>
-            <div class="text-sm text-satdark-muted">講師：{{ item.course.teacher.username }}</div>
+            <div class="font-bold text-slate-800">{{ item.course.title }}</div>
+            <div class="text-sm text-slate-500">講師：{{ item.course.teacher.profile.display_name }}</div>
           </div>
           <div class="text-right whitespace-nowrap">
             {% if item.course.has_discount %}
-            <div class="text-xs text-red-400 line-through decoration-2">NT$ {{ item.course.price }}</div>
-            <div class="text-lg font-black text-red-400">NT$ {{ item.course.get_effective_price }}</div>
+            <div class="text-xs text-red-500 line-through decoration-2">NT$ {{ item.course.price }}</div>
+            <div class="text-lg font-black text-red-600">NT$ {{ item.course.get_effective_price }}</div>
             {% else %}
             <div class="text-lg font-black text-jp-primaryHover">NT$ {{ item.course.price }}</div>
             {% endif %}
           </div>
-          <form method="post" action="{% url 'remove_from_cart' item.id %}">
+          <form method="post" action="{% url 'remove_from_cart' item.id %}" onsubmit="return confirm('確定從購物車移除這門課程？')">
             {% csrf_token %}
-            <button type="submit" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold px-3 py-2 rounded-lg text-sm transition">移除</button>
+            <button type="submit" class="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-3 py-2 rounded-lg text-sm transition">移除</button>
           </form>
         </div>
         {% endfor %}
       </div>
 
-      <div class="text-right text-xl font-black text-satdark-text my-5">合計：NT$ {{ total }}</div>
+      <div class="text-right text-xl font-black text-slate-900 my-5">合計：NT$ {{ total }}</div>
 
       <form method="post" action="{% url 'cart_checkout' %}">
         {% csrf_token %}
         <input type="text" name="coupon_code" placeholder="輸入優惠碼（可留空，符合條件的促銷會自動套用）"
-               class="w-full border border-satdark-border rounded-lg py-2.5 px-3 mb-3 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-200 transition">
+               class="w-full border border-slate-200 rounded-lg py-2.5 px-3 mb-3 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-200 transition">
         <button type="submit" class="w-full bg-jp-primary hover:bg-jp-primaryHover text-white font-bold py-3 rounded-lg transition">前往付款</button>
       </form>
     {% else %}
-      <p class="text-satdark-muted">購物車目前是空的。</p>
+      <p class="text-slate-500">購物車目前是空的。</p>
     {% endif %}
     <a href="{% url 'course_catalog' %}" class="inline-block mt-5 text-jp-primary hover:underline font-medium">← 回首頁繼續逛課程</a>
   </div>
 
-  <!-- 領取優惠券 -->
-  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-7 mb-6">
-    <h2 class="text-xl font-black text-satdark-text mb-4">🎟️ 領取優惠券</h2>
+
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7 mb-6">
+    <h2 class="text-xl font-black text-slate-900 mb-4">🎟️ 領取優惠券</h2>
     {% if available_coupons %}
     <div class="grid sm:grid-cols-2 gap-4">
       {% for c in available_coupons %}
-      <div class="border border-satdark-border border-l-4 border-l-brand-500 rounded-xl p-4 flex flex-col gap-1.5">
-        <div class="font-bold text-satdark-text">{{ c.name }}</div>
+      <div class="border border-slate-100 border-l-4 border-l-brand-500 rounded-xl p-4 flex flex-col gap-1.5">
+        <div class="font-bold text-slate-800">{{ c.name }}</div>
         <span class="self-start bg-brand-50 text-jp-primaryHover font-bold tracking-wider text-xs px-2.5 py-0.5 rounded">{{ c.code }}</span>
-        <div class="text-sm text-satdark-muted leading-relaxed">
+        <div class="text-sm text-slate-500 leading-relaxed">
           {% if c.discount_type == 'amount' %}折抵 NT$ {{ c.discount_value }}{% else %}打 {{ c.discount_value }}% 折扣{% endif %}
           ・ 最低消費 NT$ {{ c.min_spend }}<br>期限：{{ c.end_date|date:"Y-m-d" }}
         </div>
         {% if c.id in claimed_ids %}
-        <span class="text-center bg-white/10 text-satdark-muted font-bold py-2 rounded-lg text-sm">已領取</span>
+        <span class="text-center bg-slate-100 text-slate-400 font-bold py-2 rounded-lg text-sm">已領取</span>
         {% else %}
         <form method="post" action="{% url 'claim_coupon' c.id %}">
           {% csrf_token %}
@@ -106,34 +106,34 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-satdark-muted">目前沒有可領取的優惠券。</p>
+    <p class="text-slate-500">目前沒有可領取的優惠券。</p>
     {% endif %}
   </div>
 
-  <!-- 我的優惠券 -->
-  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-7">
-    <h2 class="text-xl font-black text-satdark-text mb-4">🎫 我的優惠券</h2>
+
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-7">
+    <h2 class="text-xl font-black text-slate-900 mb-4">🎫 我的優惠券</h2>
     {% if my_coupons %}
-    <div class="divide-y divide-satdark-border">
+    <div class="divide-y divide-slate-100">
       {% for uc in my_coupons %}
       <div class="flex items-center justify-between gap-3 py-3">
         <div>
-          <div class="font-bold text-satdark-text">{{ uc.coupon.name }} <span class="bg-brand-50 text-jp-primaryHover font-bold tracking-wider text-xs px-2 py-0.5 rounded">{{ uc.coupon.code }}</span></div>
-          <div class="text-sm text-satdark-muted">
+          <div class="font-bold text-slate-800">{{ uc.coupon.name }} <span class="bg-brand-50 text-jp-primaryHover font-bold tracking-wider text-xs px-2 py-0.5 rounded">{{ uc.coupon.code }}</span></div>
+          <div class="text-sm text-slate-500">
             {% if uc.coupon.discount_type == 'amount' %}折抵 NT$ {{ uc.coupon.discount_value }}{% else %}打 {{ uc.coupon.discount_value }}% 折扣{% endif %}
             ・ 期限 {{ uc.coupon.end_date|date:"Y-m-d" }}
           </div>
         </div>
         {% if uc.status == 'unused' and uc.coupon.is_expired %}
-        <span class="px-3 py-1 rounded-full text-sm font-bold bg-red-500/10 text-red-400">已過期</span>
+        <span class="px-3 py-1 rounded-full text-sm font-bold bg-red-50 text-red-600">已過期</span>
         {% else %}
-        <span class="px-3 py-1 rounded-full text-sm font-bold {% if uc.status == 'unused' %}bg-green-500/10 text-green-400{% elif uc.status == 'used' %}bg-white/10 text-satdark-muted{% else %}bg-red-500/10 text-red-400{% endif %}">{{ uc.get_status_display }}</span>
+        <span class="px-3 py-1 rounded-full text-sm font-bold {% if uc.status == 'unused' %}bg-green-50 text-green-700{% elif uc.status == 'used' %}bg-slate-100 text-slate-500{% else %}bg-red-50 text-red-600{% endif %}">{{ uc.get_status_display }}</span>
         {% endif %}
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-satdark-muted">你還沒有領取任何優惠券。</p>
+    <p class="text-slate-500">你還沒有領取任何優惠券。</p>
     {% endif %}
   </div>
 </main>

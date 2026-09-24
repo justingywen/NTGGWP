@@ -1,21 +1,37 @@
-﻿import csv
+import csv
 import json
-from django.conf import settings
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Avg, Count, Q
+from django.core.exceptions import ValidationError
+from .decorators import require_teacher, require_student, require_superuser
+from django.db.models import (
+    Avg,
+    Count,
+    F,
+    FloatField,
+    IntegerField,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+)
+from django.db.models.functions import Coalesce
+from django.db import transaction
 from django.core.paginator import Paginator
 from django.urls import reverse
-from django.utils.http import urlencode
+from django.conf import settings
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 
 from django.utils import timezone
 
 from .models import (
     Course,
     CourseLesson,
+    LessonMaterial,
+    CourseSplitSetting,
     Profile,
     Enrollment,
     LearningRecord,
@@ -26,6 +42,7 @@ from .models import (
     CouponUsage,
     Payment,
     Notification,
+    RevenueRecord,
     Review,
     Cart,
     CartItem,
@@ -36,108 +53,60 @@ from .models import (
     CourseQuestion,
     CourseAnswer,
     CourseAudit,
-    Promotion,
     CourseCategory,
-    TeacherBankAccount,
-    WithdrawalRequest,
     CourseBundle,
     CourseAnnouncement,
     CourseComment,
+    WithdrawalRequest,
+    TeacherFollow,
+    TeacherColumn,
+    TeacherArticle,
+    TeacherMaterial,
+    ColumnSubscription,
+    TeacherBankAccount,
+    MarketingRequest,
+    MarketingPlan,
+    VMAccessRequest,
+    CourseCertificate,
 )
+
+from .certificates import render_certificate_pdf
 
 from .forms import (
     RegisterForm,
+    CourseForm,
     CouponApplyForm,
     ReviewForm,
     ChapterForm,
     LessonForm,
+    LessonMaterialForm,
     QuestionForm,
     AnswerForm,
     ProfileEditForm,
-    TeacherBankAccountForm,
-    WithdrawalRequestForm,
     AnnouncementForm,
     CommentForm,
+    ColumnForm,
+    ArticleForm,
+    MaterialForm,
+    TeacherBankAccountForm,
+    MarketingRequestForm,
+    VMAccessRequestForm,
 )
-
-MIN_WITHDRAWAL_AMOUNT = 500
-
-
-def _is_teacher(profile):
-    """單一帳號體系：role=='teacher'（傳統教師帳號）或 is_teacher（Admin 額外授權）皆可使用教師專區。"""
-    return profile.role == 'teacher' or profile.is_teacher
 
 from .payments import gateway
 from . import oauth
-
-
-def _attach_reviews(courses):
-    """一次查完所有課程的評分統計，避免每堂課各發一次查詢（遠端 DB 的 N+1 效能殺手）。
-    courses 若為 QuerySet，呼叫後其 _result_cache 會被填入已標記 avg_rating/review_count
-    的物件，後續重新迭代該 QuerySet（例如樣板的 {% for %}）會直接用到快取，不需接收回傳值。"""
-    courses = list(courses)
-    ids = [c.id for c in courses]
-    stats_map = {
-        row['course']: row
-        for row in Review.objects.filter(course_id__in=ids)
-        .values('course')
-        .annotate(avg=Avg('rating'), n=Count('id'))
-    }
-    for c in courses:
-        s = stats_map.get(c.id)
-        c.avg_rating = round(s['avg'], 1) if s and s['avg'] else None
-        c.review_count = s['n'] if s else 0
-    return courses
-
+from .checkout import place_order, quote_basket, with_display_price
+from .transitions import (
+    approve_course,
+    approve_refund,
+    complete_withdrawal,
+    fulfill_order,
+    reject_course,
+    reject_refund,
+    reject_withdrawal,
+)
 
 def home(request):
-    """編輯策展式首頁：精選/熱門/最新/主題故事區塊 + 品牌信任數字，完整篩選/排序/分頁另見 course_catalog。"""
-    categories = CourseCategory.objects.order_by('name')
-    total_students = Enrollment.objects.values('student').distinct().count()
-    total_courses = Course.objects.filter(is_published=True).count()
-    total_enrollments = Enrollment.objects.count()
-    total_teachers = User.objects.filter(profile__is_teacher=True).count()
-    avg_all = Review.objects.aggregate(a=Avg('rating'))['a']
-    avg_all = round(avg_all, 1) if avg_all else 4.8
-
-    base_pub = Course.objects.filter(is_published=True).select_related('teacher', 'category')
-    popular_courses = _attach_reviews(
-        base_pub.annotate(sc=Count('enrollment', distinct=True)).order_by('-sc', '-created_at')[:10]
-    )
-    latest_courses = _attach_reviews(base_pub.order_by('-created_at')[:10])
-
-    now = timezone.now()
-    funding_courses = list(
-        base_pub.filter(
-            is_crowdfunding=True,
-            funding_start_date__lte=now,
-            funding_end_date__gte=now,
-        ).order_by('funding_end_date')[:10]
-    )
-
-    # 主題故事區塊：依課程分類分組，取代原本電商式的排序/篩選型錄頁
-    theme_sections = []
-    for category in categories:
-        cat_courses = _attach_reviews(base_pub.filter(category=category).order_by('-created_at')[:8])
-        if cat_courses:
-            theme_sections.append({'category': category, 'courses': cat_courses})
-
-    return render(request, 'main/home.html', {
-        'categories': categories,
-        'total_students': total_students,
-        'total_courses': total_courses,
-        'total_enrollments': total_enrollments,
-        'total_teachers': total_teachers,
-        'avg_all': avg_all,
-        'popular_courses': popular_courses,
-        'latest_courses': latest_courses,
-        'funding_courses': funding_courses,
-        'theme_sections': theme_sections,
-    })
-
-
-def course_catalog(request):
-    """完整課程總覽：搜尋、分類篩選、排序、分頁——從首頁搬過來，邏輯與變數名稱不變。"""
     sort = request.GET.get('sort', 'newest')
     q = request.GET.get('q', '').strip()
     cat = request.GET.get('cat', '').strip()
@@ -166,16 +135,122 @@ def course_catalog(request):
 
     paginator = Paginator(qs, 8)
     page_obj = paginator.get_page(request.GET.get('page'))
+
     _attach_reviews(page_obj.object_list)
 
-    categories = CourseCategory.objects.order_by('name')
+    categories = list(CourseCategory.objects.order_by('name'))
+    _CATEGORY_ICONS = {
+        '個人成長': 'fa-seedling', '商業管理': 'fa-briefcase', '學術教育': 'fa-graduation-cap',
+        '影視製作': 'fa-film', '手作生活': 'fa-palette', '攝影剪輯': 'fa-camera',
+        '程式設計': 'fa-code', '程式': 'fa-code', '設計': 'fa-pen-nib', '語言': 'fa-language',
+        '音樂': 'fa-music', '行銷': 'fa-bullhorn', '理財': 'fa-coins', '健身': 'fa-dumbbell',
+        '料理': 'fa-utensils', '攝影': 'fa-camera', '數據': 'fa-chart-line',
+    }
+    for c in categories:
+        icon = 'fa-folder-open'
+        for key, val in _CATEGORY_ICONS.items():
+            if key in c.name:
+                icon = val
+                break
+        c.icon = icon
+    total_students = Enrollment.objects.values('student').distinct().count()
+    total_courses = Course.objects.filter(is_published=True).count()
+    total_teachers = Course.objects.filter(is_published=True).values('teacher').distinct().count()
+    total_learning_hours = (LearningRecord.objects.aggregate(t=Sum('minutes'))['t'] or 0) // 60
+    avg_all = Review.objects.aggregate(a=Avg('rating'))['a']
+    avg_all = round(avg_all, 1) if avg_all else 4.8
 
-    return render(request, 'main/course_catalog.html', {
+    def _decorate(qs):
+        return _attach_reviews(qs)
+
+    base_pub = Course.objects.filter(is_published=True).select_related('teacher', 'category')
+    popular_courses = _decorate(
+        base_pub.annotate(sc=Count('enrollment', distinct=True)).order_by('-sc', '-created_at')[:10]
+    )
+    latest_courses = _decorate(base_pub.order_by('-created_at')[:10])
+    hero_courses = _decorate(base_pub.order_by('?')[:6])
+
+    now = timezone.now()
+    funding_courses = list(
+        base_pub.filter(
+            is_crowdfunding=True,
+            funding_start_date__lte=now,
+            funding_end_date__gte=now,
+        ).order_by('funding_end_date')[:10]
+    )
+
+    showcase_columns = []
+    showcase_image_urls = [c.image.url for c in base_pub.exclude(image='') if c.image]
+    if showcase_image_urls:
+        SHOWCASE_COLUMNS = 5
+        SHOWCASE_IMAGES_PER_COLUMN = 8
+        n = len(showcase_image_urls)
+        showcase_columns = [
+            [showcase_image_urls[(col * 3 + i) % n] for i in range(SHOWCASE_IMAGES_PER_COLUMN)]
+            for col in range(SHOWCASE_COLUMNS)
+        ]
+
+    from . import ai_assistant
+
+    continue_learning = []
+    if request.user.is_authenticated:
+        enrolled_courses = Course.objects.filter(
+            enrollment__student=request.user, is_published=True,
+        ).select_related('teacher', 'teacher__profile', 'category')
+        for ec in enrolled_courses[:6]:
+            ec_total = CourseLesson.objects.filter(chapter__course=ec).count()
+            if ec_total == 0:
+                continue
+            ec_done = LessonProgress.objects.filter(
+                user=request.user, lesson__chapter__course=ec, is_completed=True,
+            ).count()
+            ec_pct = round(ec_done / ec_total * 100) if ec_total else 0
+            if ec_pct < 100:
+                completed_ids = set(
+                    LessonProgress.objects.filter(
+                        user=request.user, lesson__chapter__course=ec, is_completed=True,
+                    ).values_list('lesson_id', flat=True)
+                )
+                next_lesson = CourseLesson.objects.filter(
+                    chapter__course=ec,
+                ).exclude(id__in=completed_ids).order_by('chapter__sort_order', 'sort_order').first()
+                continue_learning.append({
+                    'course': ec,
+                    'progress': ec_pct,
+                    'done': ec_done,
+                    'total': ec_total,
+                    'next_lesson': next_lesson,
+                })
+
+    theme_sections = []
+    for category in CourseCategory.objects.order_by('name'):
+        cat_courses = list(
+            base_pub.filter(category=category)
+            .annotate(_pop=Count('enrollment', distinct=True))
+            .order_by('-_pop')[:4]
+        )
+        if cat_courses:
+            _attach_reviews(cat_courses)
+            theme_sections.append({'category': category, 'courses': cat_courses})
+
+    return render(request, 'main/home.html', {
         'page_obj': page_obj,
         'sort': sort,
         'q': q,
         'cat': cat,
         'categories': categories,
+        'platform_faqs': ai_assistant.PLATFORM_FAQS,
+        'total_students': total_students,
+        'total_courses': total_courses,
+        'total_teachers': total_teachers,
+        'avg_all': avg_all,
+        'popular_courses': popular_courses,
+        'latest_courses': latest_courses,
+        'hero_courses': hero_courses,
+        'funding_courses': funding_courses,
+        'showcase_columns': showcase_columns,
+        'theme_sections': theme_sections,
+        'continue_learning': continue_learning,
         'sort_options': [
             ('newest', '最新'),
             ('popular', '熱門'),
@@ -184,9 +259,50 @@ def course_catalog(request):
         ],
     })
 
+def _course_stats_annotations():
+    def _for(qs, expr, alias):
+        return qs.filter(course=OuterRef('pk')).values('course').annotate(
+            **{alias: expr}
+        ).values(alias)[:1]
+
+    return {
+        'purchase_count': Coalesce(
+            Subquery(_for(Enrollment.objects.all(), Count('id'), 'n'),
+                     output_field=IntegerField()), 0),
+        'watch_minutes': Coalesce(
+            Subquery(_for(LearningRecord.objects.all(), Sum('minutes'), 's'),
+                     output_field=IntegerField()), 0),
+        'revenue': Coalesce(
+            Subquery(_for(Order.objects.filter(status='paid'), Sum('final_price'), 's'),
+                     output_field=IntegerField()), 0),
+        'rating': Subquery(
+            _for(Review.objects.all(), Avg('rating'), 'a'), output_field=FloatField()),
+    }
+
+def _visible_course_or_404(request, course_id):
+    course = get_object_or_404(Course, id=course_id)
+    if course.is_published:
+        return course, False
+
+    user = request.user
+    can_preview = user.is_authenticated and (
+        course.teacher_id == user.id
+        or user.is_superuser
+        or Enrollment.objects.filter(student=user, course=course).exists()
+    )
+    if not can_preview:
+        raise Http404('課程不存在或尚未上架')
+
+    return course, True
+
+def _purchasable_course_or_404(request, course_id):
+    course, is_preview = _visible_course_or_404(request, course_id)
+    if is_preview:
+        raise Http404('課程尚未上架，無法購買')
+    return course
 
 def course_detail(request, course_id):
-    course = get_object_or_404(Course, id=course_id)
+    course, is_preview = _visible_course_or_404(request, course_id)
 
     already_purchased = False
     can_review = False
@@ -250,55 +366,70 @@ def course_detail(request, course_id):
 
     review_count = reviews.count()
 
-    # A7：課程問答
+    rating_distribution = []
+    if review_count > 0:
+        from django.db.models import Count as _RCount
+        dist_raw = dict(
+            Review.objects.filter(course=course)
+            .values_list('rating')
+            .annotate(n=_RCount('id'))
+            .values_list('rating', 'n')
+        )
+        for star in range(5, 0, -1):
+            n = dist_raw.get(star, 0)
+            pct = round(n / review_count * 100) if review_count else 0
+            rating_distribution.append({'star': star, 'count': n, 'pct': pct})
+
     questions = CourseQuestion.objects.filter(
         course=course
     ).select_related('user').prefetch_related('answers__user').order_by('-created_at')
 
     is_course_teacher = request.user.is_authenticated and course.teacher_id == request.user.id
 
-    try:
-        teacher_bio = course.teacher.profile.bio
-    except Profile.DoesNotExist:
-        teacher_bio = None
-
-    # 課程統計（銷售頁用）
     total_lessons = CourseLesson.objects.filter(chapter__course=course).count()
     total_minutes = CourseLesson.objects.filter(chapter__course=course).aggregate(
         total=Sum('duration_minutes')
     )['total'] or 0
     student_count = Enrollment.objects.filter(course=course).count()
 
-    # 合購優惠：本課程參與的啟用中組合
-    bundles = course.bundles.filter(is_active=True).prefetch_related('courses')
-    if request.user.is_authenticated:
-        for bundle in bundles:
-            bundle.user_owns_any = Enrollment.objects.filter(
-                student=request.user, course__in=bundle.courses.all()
-            ).exists()
-    else:
-        for bundle in bundles:
-            bundle.user_owns_any = False
+    completion_rate = None
+    if student_count > 0 and total_lessons > 0:
+        from django.db.models import Count as _Count
+        completed_students = Enrollment.objects.filter(course=course).annotate(
+            done=_Count(
+                'student__lessonprogress',
+                filter=Q(
+                    student__lessonprogress__lesson__chapter__course=course,
+                    student__lessonprogress__is_completed=True,
+                )
+            )
+        ).filter(done__gte=total_lessons).count()
+        completion_rate = round(completed_students / student_count * 100)
 
-    # 課程公告：僅已購買學員／該課程教師／Admin 可見
-    can_see_announcements = already_purchased or is_course_teacher or request.user.is_superuser
-    announcements = course.announcements.select_related('author').all() if can_see_announcements else []
+    related_courses = Course.objects.filter(
+        is_published=True,
+    ).exclude(id=course.id)
+    if course.category:
+        related_courses = related_courses.filter(category=course.category)
+    related_courses = related_courses.select_related(
+        'teacher', 'teacher__profile', 'category'
+    ).annotate(
+        _student_count=Count('enrollment', distinct=True),
+    ).order_by('-_student_count')[:4]
+    _attach_reviews(related_courses)
 
-    # 課程留言：任何登入使用者皆可留言，與需購買才能發問的問答區區隔
-    comments = course.comments.select_related('user').all()
-
-    # 試看影片：彙整本課程所有標記免費試看的單元
-    preview_lessons = CourseLesson.objects.filter(
-        chapter__course=course, is_free_preview=True
-    ).select_related('chapter').order_by('chapter__sort_order', 'sort_order')
+    from . import ai_assistant
 
     return render(request, 'main/course_detail.html', {
         'course': course,
+        'platform_faqs': ai_assistant.PLATFORM_FAQS,
+        'course_faqs': ai_assistant.build_course_faq(course),
         'already_purchased': already_purchased,
         'chapters': chapters,
         'reviews': reviews,
         'average_rating': average_rating,
         'review_count': review_count,
+        'rating_distribution': rating_distribution,
         'can_review': can_review,
         'my_review': my_review,
         'review_form': review_form,
@@ -307,56 +438,40 @@ def course_detail(request, course_id):
         'question_form': QuestionForm(),
         'answer_form': AnswerForm(),
         'is_course_teacher': is_course_teacher,
-        'teacher_bio': teacher_bio,
         'total_lessons': total_lessons,
         'total_minutes': total_minutes,
         'student_count': student_count,
-        'bundles': bundles,
-        'can_see_announcements': can_see_announcements,
-        'announcements': announcements,
-        'comments': comments,
-        'comment_form': CommentForm(),
-        'preview_lessons': preview_lessons,
+        'completion_rate': completion_rate,
+        'related_courses': related_courses,
+        'is_preview': is_preview,
     })
-
 
 def register(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
 
         if form.is_valid():
-            user = User.objects.create_user(
-                username=form.cleaned_data['username'],
-                email=form.cleaned_data['email'],
-                password=form.cleaned_data['password']
-            )
-
-            # 所有新註冊帳號一律為學生身分；教師權限只能由 Admin 後台另外授予。
-            Profile.objects.create(user=user, role='student')
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    username=form.cleaned_data['username'],
+                    email=form.cleaned_data['email'],
+                    password=form.cleaned_data['password']
+                )
+                Profile.objects.create(user=user, role='student')
 
             return redirect('register_success')
     else:
         form = RegisterForm()
 
     return render(request, 'main/register.html', {
-        'form': form,
+        'form': form
     })
-
 
 def register_success(request):
     return render(request, 'main/register_success.html')
 
-
-def _post_login_redirect(user):
-    # 不論學生或具備教師權限的使用者，登入後一律回到主頁；教師專區只能透過
-    # 導覽列的「進入教師專區」按鈕主動進入，絕不在登入當下直接跳轉過去。
-    if user.is_superuser:
-        return redirect('/admin/')
-    return redirect('home')
-
-
 def login_view(request):
-    error_message = request.GET.get('error') or None
+    error_message = None
 
     if request.method == 'POST':
         login_input = request.POST.get('username')
@@ -379,87 +494,34 @@ def login_view(request):
 
         if user is not None:
             login(request, user)
-            return _post_login_redirect(user)
+
+            if user.is_superuser:
+                return redirect('/admin/')
+
+            try:
+                profile = user.profile
+
+                if profile.role == 'teacher':
+                    return redirect('teacher_dashboard')
+                elif profile.role == 'student':
+                    return redirect('student_dashboard')
+                else:
+                    return redirect('home')
+
+            except Profile.DoesNotExist:
+                return redirect('home')
+
         else:
             error_message = '帳號 / Email 或密碼錯誤。'
 
     return render(request, 'main/login.html', {
         'error_message': error_message,
+        'force_home_nav': True,
     })
-
 
 def logout_view(request):
     logout(request)
     return redirect('home')
-
-
-def _login_error_redirect(message):
-    return redirect(f"{reverse('login')}?{urlencode({'error': message})}")
-
-
-def google_login(request):
-    if not settings.GOOGLE_OAUTH_CLIENT_ID:
-        return _login_error_redirect('Google 登入尚未設定。')
-    state = oauth.new_state()
-    request.session['google_oauth_state'] = state
-    return redirect(oauth.build_google_auth_url(request, state))
-
-
-def google_oauth_callback(request):
-    error = request.GET.get('error')
-    if error:
-        return _login_error_redirect('Google 登入已取消。')
-
-    state = request.GET.get('state')
-    expected_state = request.session.pop('google_oauth_state', None)
-    if not state or not expected_state or state != expected_state:
-        return _login_error_redirect('登入驗證失敗，請再試一次。')
-
-    code = request.GET.get('code')
-    if not code:
-        return _login_error_redirect('Google 未提供授權碼。')
-
-    try:
-        provider_id, email, name = oauth.fetch_google_profile(request, code)
-        user = oauth.get_or_create_user('google', provider_id, email, name)
-    except oauth.OAuthError:
-        return _login_error_redirect('Google 登入失敗，請稍後再試。')
-
-    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-    return _post_login_redirect(user)
-
-
-def line_login(request):
-    if not settings.LINE_LOGIN_CHANNEL_ID:
-        return _login_error_redirect('LINE 登入尚未設定。')
-    state = oauth.new_state()
-    request.session['line_oauth_state'] = state
-    return redirect(oauth.build_line_auth_url(request, state))
-
-
-def line_oauth_callback(request):
-    error = request.GET.get('error')
-    if error:
-        return _login_error_redirect('LINE 登入已取消。')
-
-    state = request.GET.get('state')
-    expected_state = request.session.pop('line_oauth_state', None)
-    if not state or not expected_state or state != expected_state:
-        return _login_error_redirect('登入驗證失敗，請再試一次。')
-
-    code = request.GET.get('code')
-    if not code:
-        return _login_error_redirect('LINE 未提供授權碼。')
-
-    try:
-        provider_id, email, name = oauth.fetch_line_profile(request, code)
-        user = oauth.get_or_create_user('line', provider_id, email, name)
-    except oauth.OAuthError:
-        return _login_error_redirect('LINE 登入失敗，請稍後再試。')
-
-    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-    return _post_login_redirect(user)
-
 
 @login_required
 def profile_view(request):
@@ -484,7 +546,6 @@ def profile_view(request):
         'purchased_count': purchased_count,
     })
 
-
 @login_required
 def edit_profile(request):
     try:
@@ -505,15 +566,8 @@ def edit_profile(request):
         'profile': profile,
     })
 
-
-@login_required
+@require_student
 def student_dashboard(request):
-    # 每個帳號本質上都具備學生身份（教師權限只是額外附加），此頁不限角色。
-    try:
-        request.user.profile
-    except Profile.DoesNotExist:
-        return redirect('home')
-
     total_minutes = LearningRecord.objects.filter(
         user=request.user
     ).aggregate(
@@ -524,109 +578,191 @@ def student_dashboard(request):
         student=request.user
     ).count()
 
+    from . import gamification
+    gamification.evaluate_badges(request.user)
+    badges = gamification.badge_progress(request.user)
+
+    import datetime
+    today = datetime.date.today()
+    year_ago = today - datetime.timedelta(days=364)
+    daily_records = (
+        LearningRecord.objects.filter(
+            user=request.user,
+            watched_at__date__gte=year_ago,
+        )
+        .extra(select={'day': "DATE(watched_at)"})
+        .values('day')
+        .annotate(mins=Sum('minutes'))
+        .order_by('day')
+    )
+    heatmap_data = {str(r['day']): r['mins'] for r in daily_records}
+    import json as _json
+    heatmap_json = _json.dumps(heatmap_data)
+
     return render(request, 'main/student_dashboard.html', {
         'total_minutes': total_minutes,
         'purchased_count': purchased_count,
+        'current_streak': gamification.current_streak(request.user),
+        'longest_streak': gamification.longest_streak(request.user),
+        'badges': badges,
+        'earned_badge_count': sum(1 for b in badges if b['earned']),
+        'heatmap_json': heatmap_json,
+        'heatmap_year_ago': year_ago.isoformat(),
+        'heatmap_today': today.isoformat(),
     })
 
+@require_teacher
+def teacher_dashboard(request):
+    teacher_courses = Course.objects.filter(
+        teacher=request.user
+    ).select_related('category').annotate(**_course_stats_annotations())
 
-def _teacher_finance_summary(user):
-    """依各課程的分潤比例，計算教師目前的預估淨收入與可提領餘額。"""
-    courses = Course.objects.filter(teacher=user)
-    course_net = {}
-    total_gross = 0
-    total_net = 0
+    course_data = [
+        {
+            'course': course,
+            'purchase_count': course.purchase_count,
+            'total_watch_minutes': course.watch_minutes,
+            'total_revenue': course.revenue,
+            'average_rating': round(course.rating, 1) if course.rating else None,
+        }
+        for course in teacher_courses
+    ]
 
-    for course in courses:
-        # 用 OrderItem 聚合（而非 Order.course），才能涵蓋購物車/合購優惠等多課程訂單
-        # （這類訂單 Order.course 為 None，比照 platform_analytics 的熱銷課程統計做法）
-        gross = OrderItem.objects.filter(
-            course=course, order__status='paid'
-        ).aggregate(total=Sum('price'))['total'] or 0
-        net = gross * course.teacher_revenue_share // 100
-        course_net[course.id] = {'gross_revenue': gross, 'net_revenue': net}
-        total_gross += gross
-        total_net += net
+    return render(request, 'main/teacher_dashboard.html', {
+        'course_data': course_data
+    })
 
-    already_withdrawn = WithdrawalRequest.objects.filter(
-        teacher=user, status='APPROVED'
-    ).aggregate(s=Sum('amount'))['s'] or 0
-    pending_withdrawal = WithdrawalRequest.objects.filter(
-        teacher=user, status='PENDING'
-    ).aggregate(s=Sum('amount'))['s'] or 0
+@require_teacher
+def submit_marketing_request(request):
 
-    available_balance = max(0, total_net - already_withdrawn - pending_withdrawal)
+    initial = {}
+    course_id = request.GET.get('course') or request.POST.get('course')
+    if course_id and request.method == 'GET':
+        try:
+            course = Course.objects.get(id=course_id, teacher=request.user)
+            initial['course'] = course
+        except Course.DoesNotExist:
+            pass
 
-    return {
-        'course_net': course_net,
-        'total_gross_revenue': total_gross,
-        'total_net_income': total_net,
-        'total_withdrawn': already_withdrawn,
-        'pending_withdrawal_amount': pending_withdrawal,
-        'available_balance': available_balance,
-    }
+    if request.method == 'POST':
+        form = MarketingRequestForm(request.POST, teacher=request.user)
+        if form.is_valid():
+            marketing_request = form.save(commit=False)
+            marketing_request.teacher = request.user
+            marketing_request.status = 'pending'
+            marketing_request.save()
 
+            Notification.objects.create(
+                user=request.user,
+                title='行銷申請已送出',
+                content=f'您的課程「{marketing_request.course.title}」行銷申請已送出，等待後台處理。'
+            )
+
+            return redirect('marketing_requests')
+    else:
+        form = MarketingRequestForm(teacher=request.user, initial=initial)
+
+    return render(request, 'main/marketing_request_form.html', {'form': form})
+
+@require_teacher
+def marketing_requests(request):
+
+    requests = (
+        MarketingRequest.objects
+        .filter(teacher=request.user)
+        .select_related('course')
+        .order_by('-created_at')
+    )
+    return render(request, 'main/marketing_requests.html', {'marketing_requests': requests})
 
 @login_required
-def teacher_dashboard(request):
-    """單頁式財務與提領儀表板：淨收入、提領申請、提領明細，不含任何課程資訊。"""
+def marketing_plan_detail(request, request_id):
     try:
         profile = request.user.profile
-
-        if not _is_teacher(profile):
+        if profile.role != 'teacher' and not profile.is_teacher:
             return redirect('home')
-
     except Profile.DoesNotExist:
         return redirect('home')
 
-    bank_account = TeacherBankAccount.objects.filter(teacher=request.user).first()
-    finance = _teacher_finance_summary(request.user)
+    mreq = get_object_or_404(
+        MarketingRequest,
+        id=request_id,
+        teacher=request.user,
+    )
 
-    form = None
-    if request.method == 'POST':
-        if bank_account:
-            form = WithdrawalRequestForm(
-                request.POST,
-                available_balance=finance['available_balance'],
-                min_amount=MIN_WITHDRAWAL_AMOUNT,
-            )
-            if form.is_valid():
-                snapshot = (
-                    f"{bank_account.bank_name}"
-                    f"{' ' + bank_account.branch_name if bank_account.branch_name else ''} - "
-                    f"{bank_account.account_name} {bank_account.account_number}"
-                )
-                WithdrawalRequest.objects.create(
-                    teacher=request.user,
-                    amount=form.cleaned_data['amount'],
-                    bank_info_snapshot=snapshot,
-                    status='PENDING',
-                )
-                return redirect('teacher_dashboard')
+    try:
+        plan = mreq.plan
+    except MarketingPlan.DoesNotExist:
+        plan = None
 
-    if form is None:
-        form = WithdrawalRequestForm(
-            available_balance=finance['available_balance'],
-            min_amount=MIN_WITHDRAWAL_AMOUNT,
-        )
-
-    unanswered_questions = CourseQuestion.objects.filter(
-        course__teacher=request.user
-    ).exclude(answers__isnull=False).count()
-
-    withdrawals = WithdrawalRequest.objects.filter(
-        teacher=request.user
-    ).order_by('-created_at')
-
-    return render(request, 'main/teacher_dashboard.html', {
-        'finance': finance,
-        'min_withdrawal_amount': MIN_WITHDRAWAL_AMOUNT,
-        'bank_account': bank_account,
-        'form': form,
-        'withdrawals': withdrawals,
-        'unanswered_questions': unanswered_questions,
+    return render(request, 'main/marketing_plan_detail.html', {
+        'marketing_request': mreq,
+        'plan': plan,
     })
 
+@login_required
+def cancel_marketing_request(request, request_id):
+    try:
+        profile = request.user.profile
+        if profile.role != 'teacher' and not profile.is_teacher:
+            return redirect('home')
+    except Profile.DoesNotExist:
+        return redirect('home')
+
+    mreq = get_object_or_404(
+        MarketingRequest,
+        id=request_id,
+        teacher=request.user,
+    )
+
+    if request.method == 'POST' and mreq.status == 'pending':
+        mreq.status = 'rejected'
+        mreq.admin_note = '教師自行取消'
+        mreq.save(update_fields=['status', 'admin_note', 'updated_at'])
+
+        Notification.objects.create(
+            user=request.user,
+            title='行銷申請已取消',
+            content=f'您的課程「{mreq.course.title}」行銷申請已取消。'
+        )
+
+    return redirect('marketing_requests')
+
+@login_required
+def request_vm_access(request):
+    has_purchase = Enrollment.objects.filter(student=request.user).exists()
+    if not has_purchase:
+        return render(request, 'main/vm_request_form.html', {
+            'form': None,
+            'no_purchase': True,
+        })
+
+    if request.method == 'POST':
+        form = VMAccessRequestForm(request.POST, student=request.user)
+        if form.is_valid():
+            vm_request = form.save(commit=False)
+            vm_request.student = request.user
+            vm_request.status = 'pending'
+            vm_request.save()
+
+            Notification.objects.create(
+                user=request.user,
+                title='虛擬機申請已送出',
+                content=f'你申請的「{vm_request.course.title}」虛擬機使用申請已送出，等待管理員確認購課紀錄後核發。'
+            )
+
+            return redirect('my_vm_requests')
+    else:
+        form = VMAccessRequestForm(student=request.user)
+
+    return render(request, 'main/vm_request_form.html', {'form': form})
+
+@login_required
+def my_vm_requests(request):
+    vm_requests = VMAccessRequest.objects.filter(
+        student=request.user
+    ).select_related('course').order_by('-created_at')
+    return render(request, 'main/vm_requests.html', {'vm_requests': vm_requests})
 
 @login_required
 def my_courses(request):
@@ -635,37 +771,59 @@ def my_courses(request):
     except Profile.DoesNotExist:
         return redirect('home')
 
-    enrollments = Enrollment.objects.filter(
-        student=request.user
-    ).select_related('course', 'course__teacher', 'course__category')
+    enrollments = list(
+        Enrollment.objects.filter(student=request.user)
+        .select_related('course', 'course__teacher', 'course__category')
+        .annotate(
+            watch_minutes=Coalesce(
+                Subquery(
+                    LearningRecord.objects
+                    .filter(user=request.user, course=OuterRef('course'))
+                    .values('course').annotate(s=Sum('minutes')).values('s')[:1],
+                    output_field=IntegerField(),
+                ), 0),
+            course_total_minutes=Coalesce(
+                Subquery(
+                    CourseLesson.objects
+                    .filter(chapter__course=OuterRef('course'))
+                    .values('chapter__course')
+                    .annotate(s=Sum('duration_minutes')).values('s')[:1],
+                    output_field=IntegerField(),
+                ), 0),
+            total_lessons=Count('course__chapters__lessons', distinct=True),
+            completed_lessons=Count(
+                'course__learningrecord__lesson',
+                filter=Q(
+                    course__learningrecord__user=request.user,
+                    course__learningrecord__lesson__isnull=False,
+                ),
+                distinct=True,
+            ),
+        )
+    )
+
+    course_ids = [e.course_id for e in enrollments]
+    orders_by_course = {
+        o.course_id: o
+        for o in Order.objects.filter(
+            user=request.user, course_id__in=course_ids, status='paid'
+        ).order_by('id')
+    }
+    refunds_by_order = {
+        r.order_id: r
+        for r in Refund.objects.filter(
+            order_id__in=[o.id for o in orders_by_course.values()]
+        ).order_by('id')
+    }
 
     for enrollment in enrollments:
-        enrollment.watch_minutes = LearningRecord.objects.filter(
-            user=request.user,
-            course=enrollment.course
-        ).aggregate(
-            total=Sum('minutes')
-        )['total'] or 0
-
-        course_total = CourseLesson.objects.filter(
-            chapter__course=enrollment.course
-        ).aggregate(total=Sum('duration_minutes'))['total'] or 0
-        enrollment.course_total_minutes = course_total
-
-        if course_total > 0:
-            pct = int(min(enrollment.watch_minutes, course_total) / course_total * 100)
-        else:
-            pct = 0
-        enrollment.progress = pct
-
-        # 退款整合進我的課程：找該課的已付款訂單與退款狀態
-        order = Order.objects.filter(
-            user=request.user, course=enrollment.course, status='paid'
-        ).order_by('-id').first()
+        total = enrollment.total_lessons
+        enrollment.progress = (
+            int(min(enrollment.completed_lessons, total) / total * 100) if total > 0 else 0
+        )
+        order = orders_by_course.get(enrollment.course_id)
         enrollment.order = order
-        enrollment.refund = None
-        if order:
-            enrollment.refund = Refund.objects.filter(order=order).order_by('-id').first()
+        enrollment.refund = refunds_by_order.get(order.id) if order else None
 
     total_minutes = LearningRecord.objects.filter(
         user=request.user
@@ -678,10 +836,9 @@ def my_courses(request):
         'total_minutes': total_minutes,
     })
 
-
 @login_required
 def checkout(request, course_id):
-    course = get_object_or_404(Course, id=course_id)
+    course = _purchasable_course_or_404(request, course_id)
 
     try:
         request.user.profile
@@ -696,70 +853,22 @@ def checkout(request, course_id):
 
     form = CouponApplyForm(request.POST or None)
 
-    list_price = course.price
-    original_price = course.get_effective_price()
-    coupon = None
-    discount_amount = 0
-    final_price = original_price
-    error_message = None
-    success_message = None
-    selected_code = ''
+    action = request.POST.get('action', 'buy') if request.method == 'POST' else ''
+    selected_code = request.POST.get('coupon_code', '').strip() if request.method == 'POST' else ''
 
-    if request.method == 'POST':
-        # action：apply=只套用預覽折扣、buy=確認購買
-        action = request.POST.get('action', 'buy')
-        coupon_code = request.POST.get('coupon_code', '').strip()
-        selected_code = coupon_code
+    quote = quote_basket(request.user, [course], selected_code)
+    if quote.is_empty:
+        return redirect('course_detail', course_id=course.id)
 
-        if coupon_code:
-            try:
-                coupon = Coupon.objects.get(code__iexact=coupon_code)
+    error_message = quote.coupon_error
+    success_message = (
+        f'優惠券已套用，折抵 NT$ {quote.coupon_total}。' if quote.coupon_total > 0 else None
+    )
 
-            except Coupon.DoesNotExist:
-                coupon = None
-                error_message = '找不到這張優惠券。'
+    if action == 'buy' and not error_message:
+        order = place_order(request.user, quote)
+        return redirect('payment', order_id=order.id)
 
-            if coupon:
-                if not coupon.is_valid_now():
-                    error_message = '這張優惠券目前不可使用。'
-                    coupon = None
-
-                else:
-                    discount_amount = coupon.calculate_discount(original_price)
-
-                    if discount_amount <= 0:
-                        error_message = '此優惠券未達最低消費金額或無法套用。'
-                        coupon = None
-                        discount_amount = 0
-
-                    else:
-                        final_price = original_price - discount_amount
-                        success_message = f'優惠券已套用，折抵 NT$ {discount_amount}。'
-        elif action == 'buy':
-            success_message = None  # 沒輸入券，直接原價購買
-
-        # 只有按「確認購買」且沒有錯誤時才成立「待付款」訂單，導向付款頁；
-        # 按「套用優惠券」只重新整理頁面顯示折扣預覽。付款完成後才會開通課程。
-        if action == 'buy' and not error_message:
-            order = Order.objects.create(
-                user=request.user,
-                course=course,
-                coupon=coupon,
-                original_price=original_price,
-                discount_amount=discount_amount,
-                final_price=final_price,
-                status='pending'
-            )
-            OrderItem.objects.create(
-                order=order, course=course, price=original_price,
-                discount_amount=discount_amount, paid_amount=final_price,
-            )
-            Payment.objects.create(
-                order=order, amount=final_price, status='pending', method='mock'
-            )
-            return redirect('payment', order_id=order.id)
-
-    # A4：帶出使用者可用的優惠券供選擇
     now = timezone.now()
     my_coupons = UserCoupon.objects.filter(
         user=request.user, status='unused'
@@ -772,16 +881,16 @@ def checkout(request, course_id):
     return render(request, 'main/checkout.html', {
         'course': course,
         'form': form,
-        'list_price': list_price,
-        'original_price': original_price,
-        'discount_amount': discount_amount,
-        'final_price': final_price,
+        'list_price': quote.list_total,
+        'original_price': quote.subtotal,
+        'promo_discount': quote.promo_total,
+        'discount_amount': quote.coupon_total,
+        'final_price': quote.total,
         'error_message': error_message,
         'success_message': success_message,
         'my_coupons': my_coupons,
         'selected_code': selected_code,
     })
-
 
 @login_required
 def order_success(request, order_id):
@@ -791,23 +900,32 @@ def order_success(request, order_id):
         user=request.user
     )
 
-    # 未付款完成的訂單導回付款頁
     if order.status != 'paid':
         return redirect('payment', order_id=order.id)
 
     payment_obj = order.payments.order_by('-id').first()
+    items = order.items.select_related('course', 'course__teacher', 'course__teacher__profile').all()
+
+    purchased_ids = set(Enrollment.objects.filter(student=request.user).values_list('course_id', flat=True))
+    cat_ids = [i.course.category_id for i in items if i.course.category_id]
+    recommended_courses = (
+        Course.objects.filter(is_published=True, category_id__in=cat_ids)
+        .exclude(id__in=purchased_ids)
+        .select_related('teacher', 'teacher__profile')
+        .annotate(_pop=Count('enrollment', distinct=True))
+        .order_by('-_pop')[:4]
+    ) if cat_ids else Course.objects.none()
 
     return render(request, 'main/order_success.html', {
         'order': order,
         'payment': payment_obj,
-        'items': order.items.select_related('course').all(),
+        'items': items,
+        'recommended_courses': recommended_courses,
     })
-
 
 @login_required
 def buy_course(request, course_id):
     return redirect('checkout', course_id=course_id)
-
 
 @login_required
 def purchase_success(request, course_id):
@@ -816,7 +934,6 @@ def purchase_success(request, course_id):
     return render(request, 'main/purchase_success.html', {
         'course': course
     })
-
 
 @login_required
 def watch_course(request, course_id):
@@ -830,7 +947,6 @@ def watch_course(request, course_id):
     if not has_purchased and course.teacher_id != request.user.id:
         return redirect('course_detail', course_id=course.id)
 
-    # 導向課程第一個單元的播放頁
     first_lesson = CourseLesson.objects.filter(
         chapter__course=course
     ).order_by('chapter__sort_order', 'sort_order').first()
@@ -839,7 +955,6 @@ def watch_course(request, course_id):
         return redirect('watch_lesson', lesson_id=first_lesson.id)
 
     return redirect('course_detail', course_id=course.id)
-
 
 @login_required
 def watch_lesson(request, lesson_id):
@@ -851,11 +966,9 @@ def watch_lesson(request, lesson_id):
     enrolled = Enrollment.objects.filter(student=request.user, course=course).exists()
     is_teacher = course.teacher_id == request.user.id
 
-    # 免費試看單元任何登入者可看；其餘需購買或為講師
     if not (enrolled or is_teacher or lesson.is_free_preview):
         return redirect('course_detail', course_id=course.id)
 
-    # 側欄：所有章節/單元 + 完成狀態
     chapters = course.chapters.prefetch_related('lessons').all()
     completed_ids = set(
         LearningRecord.objects.filter(user=request.user, course=course)
@@ -868,14 +981,21 @@ def watch_lesson(request, lesson_id):
 
     is_completed = lesson.id in completed_ids
 
-    # 本單元的累積進度與續看位置
     prog = LessonProgress.objects.filter(user=request.user, lesson=lesson).first()
     lesson_percent = prog.percent() if prog else 0
     resume_position = 0
     if prog:
-        # 尚未看到接近結尾才續看，否則從頭
         if prog.duration and prog.last_position < prog.duration - 3:
             resume_position = prog.last_position
+
+    all_lessons = list(
+        CourseLesson.objects.filter(chapter__course=course)
+        .order_by('chapter__sort_order', 'sort_order')
+        .values_list('id', flat=True)
+    )
+    curr_idx = all_lessons.index(lesson.id) if lesson.id in all_lessons else -1
+    prev_lesson_id = all_lessons[curr_idx - 1] if curr_idx > 0 else None
+    next_lesson_id = all_lessons[curr_idx + 1] if curr_idx >= 0 and curr_idx < len(all_lessons) - 1 else None
 
     return render(request, 'main/watch_lesson.html', {
         'course': course,
@@ -887,14 +1007,15 @@ def watch_lesson(request, lesson_id):
         'total_lessons': total_lessons,
         'is_completed': is_completed,
         'can_record': enrolled or is_teacher,
+        'can_download_materials': enrolled or is_teacher,
         'lesson_percent': lesson_percent,
         'resume_position': resume_position,
+        'prev_lesson_id': prev_lesson_id,
+        'next_lesson_id': next_lesson_id,
     })
-
 
 @login_required
 def save_progress(request, lesson_id):
-    """AJAX：累積觀看秒數 + 記錄續看位置；達 60% 自動標記完成。"""
     if request.method != 'POST':
         return JsonResponse({'ok': False}, status=405)
 
@@ -925,7 +1046,6 @@ def save_progress(request, lesson_id):
     if duration > 0:
         prog.duration = duration
 
-    # 合併新看過的秒數進 bitmap（快轉跳過的秒不會被加入）
     n = max(len(prog.watched_map), prog.duration, (max(new_secs) + 1 if new_secs else 0))
     bitmap = list(prog.watched_map.ljust(n, '0'))
     for s in new_secs:
@@ -956,11 +1076,114 @@ def save_progress(request, lesson_id):
         'completed': prog.is_completed,
     })
 
+@require_teacher
+def create_course(request):
+
+    if request.method == 'POST':
+        form = CourseForm(request.POST, request.FILES)
+
+        if form.is_valid():
+            course = form.save(commit=False)
+            course.teacher = request.user
+            course.is_published = False
+            course.save()
+
+            CourseAudit.objects.create(course=course, status='pending')
+
+            Notification.objects.create(
+                user=request.user,
+                title='課程已送審',
+                content=f'你的課程「{course.title}」已送出審核，通過後才會上架。'
+            )
+
+            return redirect('teacher_dashboard')
+
+    else:
+        form = CourseForm()
+
+    return render(request, 'main/create_course.html', {
+        'form': form
+    })
+
+def _notify_promotion_changes(course, old_discount, old_is_crowdfunding, old_early_bird):
+    from .notifications import notify_followers
+
+    messages = []
+    if course.discount_price and (not old_discount or course.discount_price < old_discount):
+        messages.append(f'折扣價 NT$ {course.discount_price}')
+    if course.is_crowdfunding and not old_is_crowdfunding:
+        messages.append('開啟募資開課')
+    if course.early_bird_price and not old_early_bird:
+        messages.append(f'早鳥優惠價 NT$ {course.early_bird_price}')
+
+    if messages:
+        notify_followers(
+            course.teacher,
+            f'課程優惠：{course.title}',
+            f'{course.teacher.profile.display_name}老師的「{course.title}」推出'
+            + '、'.join(messages) + '，把握機會！'
+        )
+
+@require_teacher
+def edit_course(request, course_id):
+
+    course = get_object_or_404(
+        Course,
+        id=course_id,
+        teacher=request.user
+    )
+
+    if request.method == 'POST':
+        old_discount = course.discount_price
+        old_is_crowdfunding = course.is_crowdfunding
+        old_early_bird = course.early_bird_price
+        was_published = course.is_published
+
+        form = CourseForm(
+            request.POST,
+            request.FILES,
+            instance=course
+        )
+
+        if form.is_valid():
+            course = form.save()
+            if was_published:
+                _notify_promotion_changes(
+                    course, old_discount, old_is_crowdfunding, old_early_bird
+                )
+            return redirect('teacher_dashboard')
+
+    else:
+        form = CourseForm(instance=course)
+
+    return render(request, 'main/edit_course.html', {
+        'form': form,
+        'course': course
+    })
+
+@require_teacher
+def delete_course(request, course_id):
+
+    course = get_object_or_404(
+        Course,
+        id=course_id,
+        teacher=request.user
+    )
+
+    if request.method == 'POST':
+        course.delete()
+        return redirect('teacher_dashboard')
+
+    return render(request, 'main/delete_course.html', {
+        'course': course
+    })
 
 @login_required
 def student_analytics(request):
     try:
-        request.user.profile
+        profile = request.user.profile
+        if profile.role != 'student':
+            return redirect('home')
     except Profile.DoesNotExist:
         return redirect('home')
 
@@ -995,24 +1218,23 @@ def student_analytics(request):
     return render(request, 'main/student_analytics.html', {
         'total_minutes': total_minutes,
         'purchased_count': purchased_count,
-        'course_labels_json': json.dumps(course_labels, ensure_ascii=False),
-        'course_minutes_json': json.dumps(course_minutes),
+        'course_labels_json': course_labels,
+        'course_minutes_json': course_minutes,
         'recent_records': recent_records,
     })
-
 
 @login_required
 def teacher_analytics(request):
     try:
         profile = request.user.profile
-        if not _is_teacher(profile):
+        if profile.role != 'teacher':
             return redirect('home')
     except Profile.DoesNotExist:
         return redirect('home')
 
     teacher_courses = Course.objects.filter(
         teacher=request.user
-    )
+    ).annotate(**_course_stats_annotations())
 
     total_revenue = Order.objects.filter(
         course__teacher=request.user,
@@ -1038,45 +1260,22 @@ def teacher_analytics(request):
     rating_data = []
 
     for course in teacher_courses:
-        purchase_count = Enrollment.objects.filter(course=course).count()
-
-        revenue = Order.objects.filter(
-            course=course,
-            status='paid'
-        ).aggregate(
-            total=Sum('final_price')
-        )['total'] or 0
-
-        watch_minutes = LearningRecord.objects.filter(
-            course=course
-        ).aggregate(
-            total=Sum('minutes')
-        )['total'] or 0
-
-        avg_rating = Review.objects.filter(
-            course=course
-        ).aggregate(
-            avg=Avg('rating')
-        )['avg'] or 0
-
         course_labels.append(course.title)
-        purchase_counts.append(purchase_count)
-        revenue_data.append(revenue)
-        watch_minutes_data.append(watch_minutes)
-        rating_data.append(round(avg_rating, 1))
+        purchase_counts.append(course.purchase_count)
+        revenue_data.append(course.revenue)
+        watch_minutes_data.append(course.watch_minutes)
+        rating_data.append(round(course.rating, 1) if course.rating else 0)
 
     return render(request, 'main/teacher_analytics.html', {
         'total_revenue': total_revenue,
         'total_purchase_count': total_purchase_count,
         'total_watch_minutes': total_watch_minutes,
-        'course_labels_json': json.dumps(course_labels, ensure_ascii=False),
-        'purchase_counts_json': json.dumps(purchase_counts),
-        'revenue_data_json': json.dumps(revenue_data),
-        'watch_minutes_data_json': json.dumps(watch_minutes_data),
-        'rating_data_json': json.dumps(rating_data),
+        'course_labels_json': course_labels,
+        'purchase_counts_json': purchase_counts,
+        'revenue_data_json': revenue_data,
+        'watch_minutes_data_json': watch_minutes_data,
+        'rating_data_json': rating_data,
     })
-
-
 @login_required
 def export_data_page(request):
     if not request.user.is_superuser:
@@ -1105,7 +1304,6 @@ def export_data_page(request):
         'export_groups': export_groups,
     })
 
-
 @login_required
 def platform_analytics(request):
     if not request.user.is_superuser:
@@ -1124,7 +1322,6 @@ def platform_analytics(request):
     pending_audits = CourseAudit.objects.filter(status='pending').count()
     total_discount = CouponUsage.objects.aggregate(s=Sum('discount_amount'))['s'] or 0
 
-    # 近 30 天營收趨勢
     since = timezone.now() - timezone.timedelta(days=29)
     daily = (
         paid_orders.filter(created_at__gte=since)
@@ -1141,7 +1338,6 @@ def platform_analytics(request):
         revenue_labels.append(day.strftime('%m/%d'))
         revenue_series.append(daily_map.get(day, 0))
 
-    # 熱銷課程 Top 5（依訂單明細原價加總，涵蓋單課與購物車多課訂單）
     top_courses = (
         OrderItem.objects.filter(order__status='paid')
         .values('course__title')
@@ -1151,7 +1347,6 @@ def platform_analytics(request):
     top_course_labels = [t['course__title'] or '（課程已刪除）' for t in top_courses]
     top_course_revenue = [t['gross'] for t in top_courses]
 
-    # 課程分類分布
     cat_dist = (
         Course.objects.filter(is_published=True)
         .values('category__name')
@@ -1161,7 +1356,6 @@ def platform_analytics(request):
     cat_labels = [c['category__name'] or '未分類' for c in cat_dist]
     cat_counts = [c['n'] for c in cat_dist]
 
-    # 付款方式分布
     method_dist = (
         Payment.objects.filter(status='paid')
         .values('method')
@@ -1172,7 +1366,6 @@ def platform_analytics(request):
     method_labels = [method_display.get(m['method'], m['method']) for m in method_dist]
     method_counts = [m['n'] for m in method_dist]
 
-    # 訂單狀態分布
     status_dist = Order.objects.values('status').annotate(n=Count('id')).order_by('-n')
     status_display = dict(Order.STATUS_CHOICES)
     status_labels = [status_display.get(s['status'], s['status']) for s in status_dist]
@@ -1187,25 +1380,23 @@ def platform_analytics(request):
         'pending_refunds': pending_refunds,
         'pending_audits': pending_audits,
         'total_discount': total_discount,
-        'revenue_labels_json': json.dumps(revenue_labels),
-        'revenue_series_json': json.dumps(revenue_series),
-        'top_course_labels_json': json.dumps(top_course_labels, ensure_ascii=False),
-        'top_course_revenue_json': json.dumps(top_course_revenue),
-        'cat_labels_json': json.dumps(cat_labels, ensure_ascii=False),
-        'cat_counts_json': json.dumps(cat_counts),
-        'method_labels_json': json.dumps(method_labels, ensure_ascii=False),
-        'method_counts_json': json.dumps(method_counts),
-        'status_labels_json': json.dumps(status_labels, ensure_ascii=False),
-        'status_counts_json': json.dumps(status_counts),
+        'revenue_labels_json': revenue_labels,
+        'revenue_series_json': revenue_series,
+        'top_course_labels_json': top_course_labels,
+        'top_course_revenue_json': top_course_revenue,
+        'cat_labels_json': cat_labels,
+        'cat_counts_json': cat_counts,
+        'method_labels_json': method_labels,
+        'method_counts_json': method_counts,
+        'status_labels_json': status_labels,
+        'status_counts_json': status_counts,
     })
 
-
 def create_csv_response(filename):
-    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     response.write('\ufeff')
     return response
-
 
 @login_required
 def export_courses_csv(request):
@@ -1249,7 +1440,6 @@ def export_courses_csv(request):
 
     return response
 
-
 @login_required
 def export_enrollments_csv(request):
     if not request.user.is_superuser:
@@ -1286,7 +1476,6 @@ def export_enrollments_csv(request):
         ])
 
     return response
-
 
 @login_required
 def export_learning_records_csv(request):
@@ -1329,7 +1518,6 @@ def export_learning_records_csv(request):
         ])
 
     return response
-
 
 @login_required
 def export_profiles_csv(request):
@@ -1405,7 +1593,6 @@ def export_orders_csv(request):
 
     return response
 
-
 @login_required
 def export_order_items_csv(request):
     if not request.user.is_superuser:
@@ -1443,7 +1630,6 @@ def export_order_items_csv(request):
         ])
 
     return response
-
 
 @login_required
 def export_payments_csv(request):
@@ -1485,7 +1671,6 @@ def export_payments_csv(request):
 
     return response
 
-
 @login_required
 def export_coupon_usage_csv(request):
     if not request.user.is_superuser:
@@ -1522,7 +1707,6 @@ def export_coupon_usage_csv(request):
         ])
 
     return response
-
 
 @login_required
 def export_reviews_csv(request):
@@ -1567,7 +1751,6 @@ def export_reviews_csv(request):
 
     return response
 
-
 @login_required
 def export_course_lessons_csv(request):
     if not request.user.is_superuser:
@@ -1610,14 +1793,12 @@ def export_course_lessons_csv(request):
 
     return response
 
-
-# =========================
-# 購物車 Cart
-# =========================
-
 @login_required
 def add_to_cart(request, course_id):
-    course = get_object_or_404(Course, id=course_id)
+    if request.method != 'POST':
+        return redirect('course_detail', course_id=course_id)
+
+    course = _purchasable_course_or_404(request, course_id)
 
     if Enrollment.objects.filter(student=request.user, course=course).exists():
         return redirect('course_detail', course_id=course.id)
@@ -1627,63 +1808,13 @@ def add_to_cart(request, course_id):
 
     return redirect('view_cart')
 
-
-@login_required
-def add_bundle_to_cart(request, bundle_id):
-    bundle = get_object_or_404(CourseBundle, id=bundle_id, is_active=True)
-    courses = list(bundle.courses.all())
-
-    already_owns = Enrollment.objects.filter(
-        student=request.user, course__in=courses
-    ).exists()
-    if already_owns:
-        return redirect('course_detail', course_id=courses[0].id if courses else 0)
-
-    cart, _ = Cart.objects.get_or_create(user=request.user)
-    for course in courses:
-        CartItem.objects.update_or_create(
-            cart=cart, course=course, defaults={'bundle': bundle}
-        )
-
-    return redirect('view_cart')
-
-
-def _group_cart_items_by_bundle(items):
-    """把購物車項目依合購組合分組，回傳 (display_bundles, loose_items)。
-    display_bundles 每筆含 bundle/items/is_intact/individual_total。"""
-    bundle_groups = {}
-    loose_items = []
-    for item in items:
-        if item.bundle_id:
-            bundle_groups.setdefault(item.bundle_id, []).append(item)
-        else:
-            loose_items.append(item)
-
-    display_bundles = []
-    for group_items in bundle_groups.values():
-        bundle = group_items[0].bundle
-        bundle_course_ids = set(bundle.courses.values_list('id', flat=True))
-        group_course_ids = {gi.course_id for gi in group_items}
-        is_intact = bundle_course_ids == group_course_ids and bundle.is_active
-        display_bundles.append({
-            'bundle': bundle,
-            'items': group_items,
-            'is_intact': is_intact,
-            'individual_total': sum(gi.course.get_effective_price() for gi in group_items),
-        })
-
-    return display_bundles, loose_items
-
-
 @login_required
 def view_cart(request):
     cart, _ = Cart.objects.get_or_create(user=request.user)
-    items = list(cart.items.select_related('course', 'course__teacher', 'bundle').all())
-    total = sum(item.course.get_effective_price() for item in items)
+    items = list(cart.items.select_related('course', 'course__teacher').all())
+    with_display_price([item.course for item in items])
+    total = sum(item.course.display_price for item in items)
 
-    display_bundles, loose_items = _group_cart_items_by_bundle(items)
-
-    # 優惠券整合進購物車：可領取 + 我的優惠券
     now = timezone.now()
     available_coupons = Coupon.objects.filter(
         is_active=True, start_date__lte=now, end_date__gte=now
@@ -1697,151 +1828,37 @@ def view_cart(request):
 
     return render(request, 'main/cart.html', {
         'items': items,
-        'display_bundles': display_bundles,
-        'loose_items': loose_items,
         'total': total,
         'available_coupons': available_coupons,
         'claimed_ids': claimed_ids,
         'my_coupons': my_coupons,
     })
 
-
 @login_required
 def remove_from_cart(request, item_id):
+    if request.method != 'POST':
+        return redirect('view_cart')
+
     item = get_object_or_404(CartItem, id=item_id, cart__user=request.user)
     item.delete()
     return redirect('view_cart')
 
-
 @login_required
 def cart_checkout(request):
-    cart, _ = Cart.objects.get_or_create(user=request.user)
-    items = list(cart.items.select_related('course', 'bundle').all())
-    now = timezone.now()
-
-    # A5：有效促銷 → course_id 對應 Promotion
-    promo_map = {}
-    active_promos = Promotion.objects.filter(
-        is_active=True, start_date__lte=now, end_date__gte=now
-    ).prefetch_related('courses')
-    for promo in active_promos:
-        for c in promo.courses.all():
-            promo_map.setdefault(c.id, promo)
-
-    # A5：整車套用一張優惠券（依購物車總額計算，逐筆分攤）
-    coupon = None
-    if request.method == 'POST':
-        code = request.POST.get('coupon_code', '').strip()
-        if code:
-            coupon = Coupon.objects.filter(code__iexact=code).first()
-            if coupon and not coupon.is_valid_now():
-                coupon = None
-
-    # 只結帳尚未購買的課程
-    items = [i for i in items if not Enrollment.objects.filter(
-        student=request.user, course=i.course).exists()]
-    if not items:
+    if request.method != 'POST':
         return redirect('view_cart')
 
-    cart_total = sum(i.course.get_effective_price() for i in items)
-    coupon_discount = coupon.calculate_discount(cart_total) if coupon else 0
+    cart, _ = Cart.objects.get_or_create(user=request.user)
+    courses = [item.course for item in cart.items.select_related('course').all()]
 
-    # 合購優惠：組合完整才套用合購價（依各課程原價比例分攤，餘數分給組內最後一筆對齊總額），
-    # 組合被拆散（使用者移除其中一堂或已購買其中一堂）就退回個別計價並清空 bundle 標記
-    bundle_groups = {}
-    loose_items = []
-    for item in items:
-        if item.bundle_id:
-            bundle_groups.setdefault(item.bundle_id, []).append(item)
-        else:
-            loose_items.append(item)
+    quote = quote_basket(request.user, courses, request.POST.get('coupon_code', ''))
+    if quote.is_empty:
+        return redirect('view_cart')
 
-    item_price = {}
-    total_original = 0
-    total_discount = 0
-
-    for group_items in bundle_groups.values():
-        bundle = group_items[0].bundle
-        bundle_course_ids = set(bundle.courses.values_list('id', flat=True))
-        group_course_ids = {gi.course_id for gi in group_items}
-
-        if not bundle.is_active or bundle_course_ids != group_course_ids:
-            for gi in group_items:
-                gi.bundle = None
-                gi.save(update_fields=['bundle'])
-            loose_items.extend(group_items)
-            continue
-
-        individual_prices = {gi.id: gi.course.get_effective_price() for gi in group_items}
-        group_total_individual = sum(individual_prices.values())
-        allocated = 0
-        for idx, gi in enumerate(group_items):
-            if idx == len(group_items) - 1:
-                price = bundle.bundle_price - allocated
-            else:
-                price = individual_prices[gi.id] * bundle.bundle_price // group_total_individual
-                allocated += price
-            item_price[gi.id] = price
-        total_original += group_total_individual
-        total_discount += (group_total_individual - bundle.bundle_price)
-
-    for item in loose_items:
-        original = item.course.get_effective_price()
-        promo = promo_map.get(item.course.id)
-        promo_disc = 0
-        if promo:
-            if promo.discount_type == 'amount':
-                promo_disc = min(promo.discount_value, original)
-            else:
-                promo_disc = int(original * promo.discount_value / 100)
-        item_price[item.id] = original - promo_disc
-        total_original += original
-        total_discount += promo_disc
-
-    total_discount += coupon_discount
-    final_price = max(total_original - total_discount, 0)
-
-    # 優惠券折扣依各項目「合購/促銷折扣後」的價格比例分攤，得出每個項目的實付金額
-    item_discount = {}
-    item_paid = {}
-    price_sum = sum(item_price.values()) or 1
-    allocated_coupon = 0
-    for idx, item in enumerate(items):
-        if idx == len(items) - 1:
-            coupon_share = coupon_discount - allocated_coupon
-        else:
-            coupon_share = item_price[item.id] * coupon_discount // price_sum
-            allocated_coupon += coupon_share
-        item_discount[item.id] = coupon_share
-        item_paid[item.id] = item_price[item.id] - coupon_share
-
-    # 建立單一「待付款」訂單（多課程訂單，course=None），付款完成後才開通
-    order = Order.objects.create(
-        user=request.user,
-        course=None,
-        coupon=coupon if coupon_discount > 0 else None,
-        original_price=total_original,
-        discount_amount=total_discount,
-        final_price=final_price,
-        status='pending'
-    )
-    for item in items:
-        OrderItem.objects.create(
-            order=order, course=item.course, price=item_price[item.id],
-            discount_amount=item_discount[item.id], paid_amount=item_paid[item.id],
-        )
-    Payment.objects.create(
-        order=order, amount=final_price, status='pending', method='mock'
-    )
-
+    order = place_order(request.user, quote)
     cart.items.all().delete()
 
     return redirect('payment', order_id=order.id)
-
-
-# =========================
-# 模擬金流 付款流程
-# =========================
 
 def _mark_payment_paid(payment, result):
     payment.status = 'paid'
@@ -1849,38 +1866,6 @@ def _mark_payment_paid(payment, result):
     if result.transaction_no:
         payment.transaction_no = result.transaction_no
     payment.save()
-
-
-def _finalize_paid_order(order):
-    """付款成功後：開通課程、標記優惠券、發通知（具冪等性）。"""
-    if order.status == 'paid':
-        return
-    order.status = 'paid'
-    order.save()
-
-    for item in order.items.select_related('course').all():
-        Enrollment.objects.get_or_create(student=order.user, course=item.course)
-
-    if order.coupon:
-        CouponUsage.objects.get_or_create(
-            order=order,
-            defaults={
-                'user': order.user,
-                'coupon': order.coupon,
-                'discount_amount': order.discount_amount,
-            }
-        )
-        UserCoupon.objects.filter(
-            user=order.user, coupon=order.coupon, status='unused'
-        ).update(status='used', used_at=timezone.now())
-
-    titles = '、'.join(i.course.title for i in order.items.all())
-    Notification.objects.create(
-        user=order.user,
-        title='購買成功通知',
-        content=f'你已完成付款並開通課程：{titles}（實付 NT$ {order.final_price}）。'
-    )
-
 
 @login_required
 def payment(request, order_id):
@@ -1905,7 +1890,6 @@ def payment(request, order_id):
         method = request.POST.get('method', '')
 
         if action == 'select':
-            # 選擇付款方式 → 準備該方式的付款資訊
             if method == 'atm':
                 gateway.create_atm(payment_obj)
             elif method == 'cvs':
@@ -1925,17 +1909,16 @@ def payment(request, order_id):
             result = gateway.charge_credit_card(payment_obj, card)
             if result.success:
                 _mark_payment_paid(payment_obj, result)
-                _finalize_paid_order(order)
+                fulfill_order(order)
                 return redirect('order_success', order_id=order.id)
             error = result.message
             method = 'credit_card'
 
         elif action == 'confirm_offline':
-            # 使用者回報已完成 ATM 轉帳 / 超商繳費（模擬銀行/超商回拋）
             result = gateway.confirm_offline(payment_obj)
             if result.success:
                 _mark_payment_paid(payment_obj, result)
-                _finalize_paid_order(order)
+                fulfill_order(order)
                 return redirect('order_success', order_id=order.id)
             error = result.message
             method = payment_obj.method
@@ -1948,13 +1931,11 @@ def payment(request, order_id):
         'error': error,
     })
 
-
-# =========================
-# 收藏 Favorite
-# =========================
-
 @login_required
 def toggle_favorite(request, course_id):
+    if request.method != 'POST':
+        return redirect('my_favorites')
+
     course = get_object_or_404(Course, id=course_id)
     favorite = Favorite.objects.filter(user=request.user, course=course).first()
 
@@ -1963,11 +1944,12 @@ def toggle_favorite(request, course_id):
     else:
         Favorite.objects.create(user=request.user, course=course)
 
-    next_url = request.POST.get('next') or request.GET.get('next')
-    if next_url:
+    next_url = request.POST.get('next')
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
         return redirect(next_url)
     return redirect('my_favorites')
-
 
 @login_required
 def my_favorites(request):
@@ -1978,11 +1960,6 @@ def my_favorites(request):
     return render(request, 'main/favorites.html', {
         'favorites': favorites,
     })
-
-
-# =========================
-# 退款 Refund
-# =========================
 
 @login_required
 def request_refund(request, order_id):
@@ -2015,25 +1992,19 @@ def request_refund(request, order_id):
         'existing': existing,
     })
 
-
 @login_required
 def my_refunds(request):
-    # 退款已整合進「我的課程」，舊網址轉址過去
     return redirect('my_courses')
-
-
-# =========================
-# 優惠券領取 UserCoupon
-# =========================
 
 @login_required
 def coupon_list(request):
-    # 優惠券領取已整合進「購物車」，舊網址轉址過去
     return redirect('view_cart')
-
 
 @login_required
 def claim_coupon(request, coupon_id):
+    if request.method != 'POST':
+        return redirect('view_cart')
+
     coupon = get_object_or_404(Coupon, id=coupon_id)
 
     if coupon.is_valid_now():
@@ -2045,30 +2016,21 @@ def claim_coupon(request, coupon_id):
 
     return redirect('view_cart')
 
-
 @login_required
 def my_coupons(request):
-    # 優惠券管理已整合進「購物車」，舊網址轉址過去
     return redirect('view_cart')
 
-
-# =========================
-# A2 章節 / 單元管理（老師）
-# =========================
-
 def _require_course_teacher(request, course_id):
-    """回傳 (course, None) 或 (None, redirect)。只有課程講師本人可管理。"""
     try:
         profile = request.user.profile
     except Profile.DoesNotExist:
         return None, redirect('home')
 
-    if not _is_teacher(profile):
+    if profile.role != 'teacher':
         return None, redirect('home')
 
     course = get_object_or_404(Course, id=course_id, teacher=request.user)
     return course, None
-
 
 @login_required
 def manage_content(request, course_id):
@@ -2083,40 +2045,7 @@ def manage_content(request, course_id):
         'chapters': chapters,
         'chapter_form': ChapterForm(),
         'lesson_form': LessonForm(),
-        'announcements': course.announcements.all(),
-        'announcement_form': AnnouncementForm(),
     })
-
-
-@login_required
-def add_announcement(request, course_id):
-    course, redirect_resp = _require_course_teacher(request, course_id)
-    if redirect_resp:
-        return redirect_resp
-
-    if request.method == 'POST':
-        form = AnnouncementForm(request.POST)
-        if form.is_valid():
-            announcement = form.save(commit=False)
-            announcement.course = course
-            announcement.author = request.user
-            announcement.save()
-
-    return redirect('manage_content', course_id=course.id)
-
-
-@login_required
-def delete_announcement(request, announcement_id):
-    announcement = get_object_or_404(CourseAnnouncement, id=announcement_id)
-    course, redirect_resp = _require_course_teacher(request, announcement.course_id)
-    if redirect_resp:
-        return redirect_resp
-
-    if request.method == 'POST':
-        announcement.delete()
-
-    return redirect('manage_content', course_id=course.id)
-
 
 @login_required
 def add_chapter(request, course_id):
@@ -2132,7 +2061,6 @@ def add_chapter(request, course_id):
             chapter.save()
 
     return redirect('manage_content', course_id=course.id)
-
 
 @login_required
 def edit_chapter(request, chapter_id):
@@ -2155,7 +2083,6 @@ def edit_chapter(request, chapter_id):
         'course': course,
     })
 
-
 @login_required
 def delete_chapter(request, chapter_id):
     chapter = get_object_or_404(CourseChapter, id=chapter_id)
@@ -2168,9 +2095,7 @@ def delete_chapter(request, chapter_id):
 
     return redirect('manage_content', course_id=course.id)
 
-
 def _autoset_lesson_duration(lesson):
-    """上傳影片檔後自動偵測時長，寫回 duration_minutes（老師免手動輸入）。"""
     if not lesson.video_file:
         return
     try:
@@ -2181,7 +2106,6 @@ def _autoset_lesson_duration(lesson):
             lesson.save(update_fields=['duration_minutes'])
     except Exception:
         pass
-
 
 @login_required
 def add_lesson(request, chapter_id):
@@ -2198,8 +2122,14 @@ def add_lesson(request, chapter_id):
             lesson.save()
             _autoset_lesson_duration(lesson)
 
-    return redirect('manage_content', course_id=course.id)
+            from .notifications import notify_course_buyers
+            notify_course_buyers(
+                course,
+                f'課程新影片：{course.title}',
+                f'你購買的「{course.title}」新增了單元「{lesson.title}」，快去觀看！'
+            )
 
+    return redirect('manage_content', course_id=course.id)
 
 @login_required
 def edit_lesson(request, lesson_id):
@@ -2221,8 +2151,40 @@ def edit_lesson(request, lesson_id):
         'form': form,
         'lesson': lesson,
         'course': course,
+        'materials': lesson.materials.all(),
+        'material_form': LessonMaterialForm(),
     })
 
+@login_required
+def add_lesson_material(request, lesson_id):
+    lesson = get_object_or_404(CourseLesson, id=lesson_id)
+    course, redirect_resp = _require_course_teacher(request, lesson.chapter.course_id)
+    if redirect_resp:
+        return redirect_resp
+
+    if request.method == 'POST':
+        form = LessonMaterialForm(request.POST, request.FILES)
+        if form.is_valid():
+            material = form.save(commit=False)
+            material.lesson = lesson
+            if material.file:
+                material.size_bytes = material.file.size
+            material.save()
+
+    return redirect('edit_lesson', lesson_id=lesson.id)
+
+@login_required
+def delete_material(request, material_id):
+    material = get_object_or_404(LessonMaterial, id=material_id)
+    lesson = material.lesson
+    course, redirect_resp = _require_course_teacher(request, lesson.chapter.course_id)
+    if redirect_resp:
+        return redirect_resp
+
+    if request.method == 'POST':
+        material.delete()
+
+    return redirect('edit_lesson', lesson_id=lesson.id)
 
 @login_required
 def delete_lesson(request, lesson_id):
@@ -2236,11 +2198,6 @@ def delete_lesson(request, lesson_id):
 
     return redirect('manage_content', course_id=course.id)
 
-
-# =========================
-# A3 退款審核（老師 / 管理員）
-# =========================
-
 @login_required
 def manage_refunds(request):
     if request.user.is_superuser:
@@ -2252,7 +2209,7 @@ def manage_refunds(request):
             profile = request.user.profile
         except Profile.DoesNotExist:
             return redirect('home')
-        if not _is_teacher(profile):
+        if profile.role != 'teacher':
             return redirect('home')
         refunds = Refund.objects.filter(
             order__course__teacher=request.user
@@ -2262,12 +2219,10 @@ def manage_refunds(request):
         'refunds': refunds,
     })
 
-
 @login_required
 def process_refund(request, refund_id):
     refund = get_object_or_404(Refund, id=refund_id)
 
-    # 權限：管理員或該課程講師
     is_teacher = (
         not request.user.is_superuser
         and refund.order.course
@@ -2276,36 +2231,14 @@ def process_refund(request, refund_id):
     if not (request.user.is_superuser or is_teacher):
         return redirect('home')
 
-    if request.method == 'POST':
+    if request.method == 'POST' and refund.status == 'pending':
         action = request.POST.get('action')
-        if action == 'approve' and refund.status == 'pending':
-            refund.status = 'approved'
-            refund.processed_at = timezone.now()
-            refund.save()
-            order = refund.order
-            order.status = 'refunded'
-            order.save()
-            Notification.objects.create(
-                user=refund.user,
-                title='退款已通過',
-                content=f'訂單 #{order.id} 的退款申請已通過，將退還 NT$ {refund.amount}。'
-            )
-        elif action == 'reject' and refund.status == 'pending':
-            refund.status = 'rejected'
-            refund.processed_at = timezone.now()
-            refund.save()
-            Notification.objects.create(
-                user=refund.user,
-                title='退款未通過',
-                content=f'訂單 #{refund.order.id} 的退款申請未通過。'
-            )
+        if action == 'approve':
+            approve_refund(refund)
+        elif action == 'reject':
+            reject_refund(refund)
 
     return redirect('manage_refunds')
-
-
-# =========================
-# A6 通知中心
-# =========================
 
 @login_required
 def notifications(request):
@@ -2317,7 +2250,6 @@ def notifications(request):
         'notifications': notes,
     })
 
-
 @login_required
 def mark_notifications_read(request):
     if request.method == 'POST':
@@ -2326,26 +2258,19 @@ def mark_notifications_read(request):
         ).update(is_read=True)
     return redirect('notifications')
 
-
-# =========================
-# A7 課程問答
-# =========================
-
 @login_required
 def add_question(request, course_id):
     course = get_object_or_404(Course, id=course_id)
 
-    purchased = Enrollment.objects.filter(
-        student=request.user, course=course
-    ).exists()
     is_teacher = course.teacher_id == request.user.id
 
-    if request.method == 'POST' and (purchased or is_teacher):
+    if request.method == 'POST':
         form = QuestionForm(request.POST)
         if form.is_valid():
             q = form.save(commit=False)
             q.user = request.user
             q.course = course
+            q.title = (q.content or '')[:50]
             q.save()
             if not is_teacher:
                 Notification.objects.create(
@@ -2354,16 +2279,23 @@ def add_question(request, course_id):
                     content=f'課程「{course.title}」收到新的問題：{q.title}'
                 )
 
-    return redirect('course_detail', course_id=course.id)
+                from . import ai_assistant
+                if ai_assistant.auto_answer_question(q):
+                    Notification.objects.create(
+                        user=q.user,
+                        title='AI 助教已回覆你的提問',
+                        content=f'課程「{course.title}」中你的問題「{q.title}」已有 AI 助教的參考回覆，講師稍後仍會親自確認。'
+                    )
 
+    return redirect('course_detail', course_id=course.id)
 
 @login_required
 def add_answer(request, question_id):
     question = get_object_or_404(CourseQuestion, id=question_id)
     course = question.course
 
-    is_course_teacher = course.teacher_id == request.user.id
-    if not (is_course_teacher or request.user.is_superuser):
+    is_teacher = course.teacher_id == request.user.id
+    if not (is_teacher or request.user.is_superuser):
         return redirect('course_detail', course_id=course.id)
 
     if request.method == 'POST':
@@ -2379,89 +2311,7 @@ def add_answer(request, question_id):
                 content=f'課程「{course.title}」中你的問題「{question.title}」已有回答。'
             )
 
-    if request.POST.get('source') == 'teacher_qna':
-        return redirect('teacher_qna')
     return redirect('course_detail', course_id=course.id)
-
-
-# =========================
-# 課程留言區（開放任何登入使用者，與需購買才能發問的問答區區隔）
-# =========================
-
-@login_required
-def add_comment(request, course_id):
-    course = get_object_or_404(Course, id=course_id)
-
-    if request.method == 'POST':
-        form = CommentForm(request.POST)
-        if form.is_valid():
-            comment = form.save(commit=False)
-            comment.user = request.user
-            comment.course = course
-            comment.save()
-
-    return redirect('course_detail', course_id=course.id)
-
-
-# =========================
-# 教師專區：Q&A 管理
-# =========================
-
-@login_required
-def teacher_qna(request):
-    try:
-        profile = request.user.profile
-        if not _is_teacher(profile):
-            return redirect('home')
-    except Profile.DoesNotExist:
-        return redirect('home')
-
-    questions = CourseQuestion.objects.filter(
-        course__teacher=request.user
-    ).select_related('user', 'course').prefetch_related('answers').annotate(
-        answer_count=Count('answers')
-    ).order_by('answer_count', '-created_at')
-
-    return render(request, 'main/teacher_qna.html', {
-        'questions': questions,
-        'answer_form': AnswerForm(),
-    })
-
-
-# =========================
-# 教師專區：銀行帳戶與提領
-# =========================
-
-@login_required
-def edit_bank_account(request):
-    try:
-        profile = request.user.profile
-        if not _is_teacher(profile):
-            return redirect('home')
-    except Profile.DoesNotExist:
-        return redirect('home')
-
-    bank_account, _created = TeacherBankAccount.objects.get_or_create(
-        teacher=request.user,
-        defaults={'bank_name': '', 'account_name': '', 'account_number': ''}
-    )
-
-    if request.method == 'POST':
-        form = TeacherBankAccountForm(request.POST, instance=bank_account)
-        if form.is_valid():
-            form.save()
-            return redirect('teacher_dashboard')
-    else:
-        form = TeacherBankAccountForm(instance=bank_account)
-
-    return render(request, 'main/edit_bank_account.html', {
-        'form': form,
-    })
-
-
-# =========================
-# A8 課程審核（管理員）
-# =========================
 
 @login_required
 def manage_audits(request):
@@ -2476,7 +2326,6 @@ def manage_audits(request):
         'audits': audits,
     })
 
-
 @login_required
 def process_audit(request, audit_id):
     if not request.user.is_superuser:
@@ -2489,49 +2338,245 @@ def process_audit(request, audit_id):
         comment = request.POST.get('comment', '').strip()
 
         if action == 'approve':
-            audit.status = 'approved'
-            audit.reviewer = request.user
-            audit.comment = comment
-            audit.reviewed_at = timezone.now()
-            audit.save()
-            course = audit.course
-            course.is_published = True
-            course.save()
-            Notification.objects.create(
-                user=course.teacher,
-                title='課程審核通過',
-                content=f'你的課程「{course.title}」已通過審核並上架。'
-            )
+            approve_course(audit.course, request.user, comment)
         elif action == 'reject':
-            audit.status = 'rejected'
-            audit.reviewer = request.user
-            audit.comment = comment
-            audit.reviewed_at = timezone.now()
-            audit.save()
-            course = audit.course
-            course.is_published = False
-            course.save()
-            Notification.objects.create(
-                user=course.teacher,
-                title='課程審核未通過',
-                content=f'你的課程「{course.title}」未通過審核。原因：{comment or "未提供"}'
-            )
+            reject_course(audit.course, request.user, comment)
 
     return redirect('manage_audits')
 
-# =========================
-# Task 2 課程完成證書（PDF）
-# =========================
+def _require_teacher_profile(request):
+    try:
+        profile = request.user.profile
+    except Profile.DoesNotExist:
+        return None
+    return profile if profile.role == 'teacher' else None
+
+@login_required
+def my_revenue(request):
+    if not _require_teacher_profile(request):
+        return redirect('home')
+
+    records = RevenueRecord.objects.filter(
+        teacher=request.user
+    ).select_related('course', 'order').order_by('-created_at')
+
+    paginator = Paginator(records, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    totals = records.filter(status='confirmed').aggregate(
+        gross_amount=Sum('gross_amount'),
+        marketing_cost=Sum('marketing_cost'),
+        teacher_amount=Sum('teacher_amount'),
+    )
+
+    course_rules = [
+        CourseSplitSetting.for_course(course)
+        for course in Course.objects.filter(teacher=request.user).order_by('title')
+    ]
+
+    return render(request, 'main/my_revenue.html', {
+        'page_obj': page_obj,
+        'totals': totals,
+        'course_rules': course_rules,
+        'available_balance': WithdrawalRequest.available_balance(request.user),
+        'default_teacher_split': CourseSplitSetting.DEFAULT_TEACHER_SPLIT_PERCENT,
+        'default_company_split': CourseSplitSetting.DEFAULT_COMPANY_SPLIT_PERCENT,
+        'default_teacher_marketing_share': CourseSplitSetting.DEFAULT_TEACHER_MARKETING_SHARE_PERCENT,
+        'default_company_marketing_share': CourseSplitSetting.DEFAULT_COMPANY_MARKETING_SHARE_PERCENT,
+    })
+
+@login_required
+def edit_bank_account(request):
+    if not _require_teacher_profile(request):
+        return redirect('home')
+
+    bank_account, _ = TeacherBankAccount.objects.get_or_create(
+        teacher=request.user,
+        defaults={'bank_name': '', 'account_name': '', 'account_number': ''},
+    )
+
+    if request.method == 'POST':
+        form = TeacherBankAccountForm(request.POST, instance=bank_account)
+        if form.is_valid():
+            form.save()
+            return redirect('my_withdrawals')
+    else:
+        form = TeacherBankAccountForm(instance=bank_account)
+
+    return render(request, 'main/edit_bank_account.html', {'form': form})
+
+@login_required
+def my_withdrawals(request):
+    if not _require_teacher_profile(request):
+        return redirect('home')
+
+    error = None
+    bank_account = TeacherBankAccount.objects.filter(teacher=request.user).first()
+    has_bank_account = bool(bank_account and bank_account.is_complete())
+
+    if request.method == 'POST':
+        if not has_bank_account:
+            error = '請先綁定收款銀行帳戶，才能申請提領。'
+        else:
+            amount_raw = request.POST.get('amount', '').strip()
+            try:
+                amount = int(amount_raw)
+                if amount <= 0:
+                    raise ValueError
+            except ValueError:
+                error = '請輸入正確的提領金額（正整數）。'
+            else:
+                withdrawal = WithdrawalRequest(
+                    teacher=request.user,
+                    amount=amount,
+                    bank_info_snapshot=bank_account.snapshot_text(),
+                )
+                try:
+                    withdrawal.save()
+                except ValidationError as e:
+                    error = ' '.join(e.messages)
+                else:
+                    Notification.objects.create(
+                        user=request.user,
+                        title='提領申請已送出',
+                        content=f'你申請提領的 NT$ {amount} 已送出，等待處理。'
+                    )
+                    return redirect('my_withdrawals')
+
+    withdrawals = WithdrawalRequest.objects.filter(
+        teacher=request.user
+    ).order_by('-requested_at')
+
+    return render(request, 'main/my_withdrawals.html', {
+        'withdrawals': withdrawals,
+        'available_balance': WithdrawalRequest.available_balance(request.user),
+        'error': error,
+        'bank_account': bank_account,
+        'has_bank_account': has_bank_account,
+    })
+
+@login_required
+def manage_withdrawals(request):
+    if not request.user.is_superuser:
+        return redirect('home')
+
+    withdrawals = WithdrawalRequest.objects.select_related(
+        'teacher'
+    ).order_by('-requested_at')
+
+    return render(request, 'main/manage_withdrawals.html', {
+        'withdrawals': withdrawals,
+    })
+
+@login_required
+def process_withdrawal(request, withdrawal_id):
+    if not request.user.is_superuser:
+        return redirect('home')
+
+    withdrawal = get_object_or_404(WithdrawalRequest, id=withdrawal_id)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        note = request.POST.get('note', '').strip()
+
+        if action == 'complete':
+            complete_withdrawal(withdrawal, note=note)
+        elif action == 'reject':
+            reject_withdrawal(withdrawal, note=note)
+
+    return redirect('manage_withdrawals')
+
+@login_required
+def export_my_revenue_csv(request):
+    if not _require_teacher_profile(request):
+        return redirect('home')
+
+    response = create_csv_response('my_revenue.csv')
+    writer = csv.writer(response)
+
+    writer.writerow([
+        'record_id',
+        'course_id',
+        'course_title',
+        'order_id',
+        'gross_amount',
+        'marketing_cost',
+        'teacher_split_percent',
+        'company_split_percent',
+        'teacher_marketing_share_percent',
+        'company_marketing_share_percent',
+        'teacher_amount',
+        'company_amount',
+        'status',
+        'created_at',
+        'reversed_at',
+    ])
+
+    records = RevenueRecord.objects.filter(
+        teacher=request.user
+    ).select_related('course', 'order').order_by('-created_at')
+
+    for r in records:
+        writer.writerow([
+            r.id,
+            r.course_id,
+            r.course.title,
+            r.order_id,
+            r.gross_amount,
+            r.marketing_cost,
+            r.teacher_split_percent,
+            r.company_split_percent,
+            r.teacher_marketing_share_percent,
+            r.company_marketing_share_percent,
+            r.teacher_amount,
+            r.company_amount,
+            r.get_status_display(),
+            r.created_at,
+            r.reversed_at or '',
+        ])
+
+    return response
+
+@login_required
+def export_my_withdrawals_csv(request):
+    if not _require_teacher_profile(request):
+        return redirect('home')
+
+    response = create_csv_response('my_withdrawals.csv')
+    writer = csv.writer(response)
+
+    writer.writerow([
+        'withdrawal_id',
+        'amount',
+        'status',
+        'note',
+        'requested_at',
+        'processed_at',
+    ])
+
+    withdrawals = WithdrawalRequest.objects.filter(
+        teacher=request.user
+    ).order_by('-requested_at')
+
+    for w in withdrawals:
+        writer.writerow([
+            w.id,
+            w.amount,
+            w.get_status_display(),
+            w.note or '',
+            w.requested_at,
+            w.processed_at or '',
+        ])
+
+    return response
 
 def _course_completion(user, course):
-    """回傳 (total_lessons, done_count, is_complete)。"""
     total = CourseLesson.objects.filter(chapter__course=course).count()
     done = LearningRecord.objects.filter(
         user=user, course=course
     ).exclude(lesson=None).values('lesson').distinct().count()
     is_complete = total > 0 and done >= total
     return total, done, is_complete
-
 
 @login_required
 def certificate(request, course_id):
@@ -2540,100 +2585,75 @@ def certificate(request, course_id):
     if not Enrollment.objects.filter(student=request.user, course=course).exists():
         return redirect('course_detail', course_id=course.id)
 
-    total, done, is_complete = _course_completion(request.user, course)
+    _, _, is_complete = _course_completion(request.user, course)
     if not is_complete:
         return redirect('my_courses')
 
-    import io
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.units import mm
-    from reportlab.pdfgen import canvas
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-
-    # 繁體中文內建 CID 字型（免安裝字型檔）
-    pdfmetrics.registerFont(UnicodeCIDFont('MSung-Light'))
-    FONT = 'MSung-Light'
-
-    buffer = io.BytesIO()
-    W, H = landscape(A4)
-    c = canvas.Canvas(buffer, pagesize=landscape(A4))
-
-    # 背景與外框
-    c.setFillColorRGB(0.97, 0.97, 1.0)
-    c.rect(0, 0, W, H, fill=1, stroke=0)
-    c.setStrokeColorRGB(0.31, 0.27, 0.90)
-    c.setLineWidth(4)
-    c.rect(15 * mm, 15 * mm, W - 30 * mm, H - 30 * mm, fill=0, stroke=1)
-    c.setStrokeColorRGB(0.49, 0.36, 0.93)
-    c.setLineWidth(1)
-    c.rect(19 * mm, 19 * mm, W - 38 * mm, H - 38 * mm, fill=0, stroke=1)
-
-    cx = W / 2
-
-    c.setFillColorRGB(0.31, 0.27, 0.90)
-    c.setFont(FONT, 40)
-    c.drawCentredString(cx, H - 55 * mm, '結業證書')
-
-    c.setFillColorRGB(0.42, 0.45, 0.5)
-    c.setFont('Helvetica', 14)
-    c.drawCentredString(cx, H - 66 * mm, 'CERTIFICATE OF COMPLETION')
-
-    c.setFillColorRGB(0.2, 0.2, 0.25)
-    c.setFont(FONT, 15)
-    c.drawCentredString(cx, H - 90 * mm, '茲證明')
-
-    c.setFillColorRGB(0.1, 0.1, 0.15)
-    c.setFont(FONT, 30)
-    c.drawCentredString(cx, H - 108 * mm, request.user.username)
-
-    c.setStrokeColorRGB(0.7, 0.7, 0.75)
-    c.setLineWidth(0.8)
-    c.line(cx - 70 * mm, H - 112 * mm, cx + 70 * mm, H - 112 * mm)
-
-    c.setFillColorRGB(0.2, 0.2, 0.25)
-    c.setFont(FONT, 15)
-    c.drawCentredString(cx, H - 126 * mm, '已完成本平台線上課程')
-
-    c.setFillColorRGB(0.31, 0.27, 0.90)
-    c.setFont(FONT, 22)
-    c.drawCentredString(cx, H - 142 * mm, course.title)
-
-    c.setFillColorRGB(0.3, 0.3, 0.35)
-    c.setFont(FONT, 13)
-    c.drawCentredString(cx, H - 158 * mm, f'授課講師：{course.teacher.username}　　完成日期：{timezone.now():%Y-%m-%d}')
-
-    c.setFillColorRGB(0.55, 0.55, 0.6)
-    c.setFont('Helvetica', 10)
-    c.drawCentredString(cx, 26 * mm, f'Course Platform　|　證書編號 CERT-{course.id:04d}-{request.user.id:04d}')
-
-    c.showPage()
-    c.save()
-    buffer.seek(0)
-
-    response = HttpResponse(buffer, content_type='application/pdf')
-    filename = f'certificate_{course.id}_{request.user.id}.pdf'
+    issued_certificate, _ = CourseCertificate.objects.get_or_create(
+        student=request.user,
+        course=course,
+    )
+    pdf_bytes = render_certificate_pdf(issued_certificate)
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    filename = f'eduflow-certificate-{issued_certificate.certificate_number}.pdf'
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
+def teacher_catalog(request):
+    q = request.GET.get('q', '').strip()
 
-# =========================
-# Task 4 講師公開頁
-# =========================
+    teacher_ids = (
+        Course.objects.filter(is_published=True)
+        .values_list('teacher_id', flat=True)
+        .distinct()
+    )
+    teachers = User.objects.filter(id__in=teacher_ids).select_related('profile')
+    if q:
+        teachers = teachers.filter(
+            Q(username__icontains=q)
+            | Q(first_name__icontains=q)
+            | Q(last_name__icontains=q)
+        )
+
+    review_stats = Review.objects.filter(course__teacher=OuterRef('pk')).values('course__teacher')
+    teachers = teachers.annotate(
+        course_count=Count('course', filter=Q(course__is_published=True), distinct=True),
+        student_count=Count('course__enrollment', distinct=True),
+        avg_rating_raw=Subquery(
+            review_stats.annotate(a=Avg('rating')).values('a')[:1],
+            output_field=FloatField()),
+    ).order_by('-course_count', '-student_count', 'username')
+
+    teachers = list(teachers)
+    for t in teachers:
+        t.avg_rating = round(t.avg_rating_raw, 1) if t.avg_rating_raw else None
+
+    return render(request, 'main/teacher_catalog.html', {
+        'teachers': teachers,
+        'q': q,
+        'total_teachers': len(teachers),
+    })
 
 def teacher_profile(request, teacher_id):
     teacher = get_object_or_404(User, id=teacher_id)
 
+    review_stats = Review.objects.filter(course=OuterRef('pk')).values('course')
     courses = list(
         Course.objects.filter(teacher=teacher, is_published=True)
         .select_related('category')
-        .annotate(student_count=Count('enrollment', distinct=True))
+        .annotate(
+            student_count=Count('enrollment', distinct=True),
+            avg_rating_raw=Subquery(
+                review_stats.annotate(a=Avg('rating')).values('a')[:1],
+                output_field=FloatField()),
+            review_count=Coalesce(
+                Subquery(review_stats.annotate(n=Count('id')).values('n')[:1],
+                         output_field=IntegerField()), 0),
+        )
         .order_by('-created_at')
     )
     for c in courses:
-        stats = Review.objects.filter(course=c).aggregate(avg=Avg('rating'), n=Count('id'))
-        c.avg_rating = round(stats['avg'], 1) if stats['avg'] else None
-        c.review_count = stats['n']
+        c.avg_rating = round(c.avg_rating_raw, 1) if c.avg_rating_raw else None
 
     total_students = Enrollment.objects.filter(
         course__teacher=teacher
@@ -2648,12 +2668,39 @@ def teacher_profile(request, teacher_id):
     ).select_related('user', 'course').order_by('-created_at')[:6]
 
     try:
-        role_display = teacher.profile.get_role_display()
+        profile = teacher.profile
+        role_display = profile.get_role_display()
     except Profile.DoesNotExist:
+        profile = None
         role_display = ''
+
+    is_owner = request.user.is_authenticated and request.user.id == teacher.id
+
+    is_following = (
+        request.user.is_authenticated
+        and not is_owner
+        and TeacherFollow.objects.filter(follower=request.user, teacher=teacher).exists()
+    )
+    follower_count = TeacherFollow.objects.filter(teacher=teacher).count()
+
+    columns = TeacherColumn.objects.filter(teacher=teacher)
+    articles = TeacherArticle.objects.filter(teacher=teacher).select_related('column')
+    materials = TeacherMaterial.objects.filter(teacher=teacher)
+    if not is_owner:
+        columns = columns.filter(is_published=True)
+        articles = articles.filter(is_published=True)
+        materials = materials.filter(is_published=True)
+    columns = list(columns)
+    articles = list(articles)
+    materials = list(materials)
+
+    tab = request.GET.get('tab', 'course')
+    if tab not in ('course', 'column', 'article', 'material'):
+        tab = 'course'
 
     return render(request, 'main/teacher_profile.html', {
         'teacher': teacher,
+        'profile': profile,
         'role_display': role_display,
         'courses': courses,
         'course_count': len(courses),
@@ -2661,12 +2708,306 @@ def teacher_profile(request, teacher_id):
         'avg_rating': avg_rating,
         'review_count': review_count,
         'recent_reviews': recent_reviews,
+        'is_owner': is_owner,
+        'is_following': is_following,
+        'follower_count': follower_count,
+        'columns': columns,
+        'articles': articles,
+        'materials': materials,
+        'column_count': len(columns),
+        'article_count': len(articles),
+        'material_count': len(materials),
+        'active_tab': tab,
+        'tabs': [
+            ('course', '課程', len(courses)),
+            ('column', '專欄', len(columns)),
+            ('article', '文章', len(articles)),
+            ('material', '教材', len(materials)),
+        ],
     })
 
+@login_required
+def toggle_follow(request, teacher_id):
+    teacher = get_object_or_404(User, id=teacher_id)
+    if request.method == 'POST' and teacher.id != request.user.id:
+        existing = TeacherFollow.objects.filter(follower=request.user, teacher=teacher).first()
+        if existing:
+            existing.delete()
+        else:
+            TeacherFollow.objects.create(follower=request.user, teacher=teacher)
+    default_url = reverse('teacher_profile', args=[teacher.id])
+    next_url = request.POST.get('next')
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return redirect(next_url)
+    return redirect(default_url)
 
-# =========================
-# 支援 Range 的媒體服務（開發環境播放影片用）
-# =========================
+@login_required
+def my_following(request):
+    follows = TeacherFollow.objects.filter(
+        follower=request.user
+    ).select_related('teacher', 'teacher__profile').order_by('-created_at')
+    return render(request, 'main/my_following.html', {
+        'follows': follows,
+    })
+
+def _require_teacher(request):
+    try:
+        profile = request.user.profile
+    except Profile.DoesNotExist:
+        return None, redirect('home')
+    if profile.role != 'teacher':
+        return None, redirect('home')
+    return profile, None
+
+@login_required
+def teacher_content(request):
+    profile, redirect_resp = _require_teacher(request)
+    if redirect_resp:
+        return redirect_resp
+
+    columns = TeacherColumn.objects.filter(teacher=request.user)
+    articles = TeacherArticle.objects.filter(teacher=request.user).select_related('column')
+    materials = TeacherMaterial.objects.filter(teacher=request.user)
+
+    tab = request.GET.get('tab', 'column')
+    if tab not in ('column', 'article', 'material'):
+        tab = 'column'
+
+    return render(request, 'main/teacher_content.html', {
+        'columns': columns,
+        'articles': articles,
+        'materials': materials,
+        'active_tab': tab,
+        'tab_defs': [('column', '專欄'), ('article', '文章'), ('material', '教材')],
+    })
+
+@login_required
+def add_column(request):
+    profile, redirect_resp = _require_teacher(request)
+    if redirect_resp:
+        return redirect_resp
+    if request.method == 'POST':
+        form = ColumnForm(request.POST, request.FILES)
+        if form.is_valid():
+            column = form.save(commit=False)
+            column.teacher = request.user
+            column.save()
+            return redirect('teacher_content')
+    else:
+        form = ColumnForm()
+    return render(request, 'main/content_form.html', {
+        'form': form, 'content_kind': '專欄', 'is_edit': False,
+    })
+
+@login_required
+def edit_column(request, column_id):
+    column = get_object_or_404(TeacherColumn, id=column_id, teacher=request.user)
+    if request.method == 'POST':
+        form = ColumnForm(request.POST, request.FILES, instance=column)
+        if form.is_valid():
+            form.save()
+            return redirect('teacher_content')
+    else:
+        form = ColumnForm(instance=column)
+    return render(request, 'main/content_form.html', {
+        'form': form, 'content_kind': '專欄', 'is_edit': True,
+    })
+
+@login_required
+def delete_column(request, column_id):
+    column = get_object_or_404(TeacherColumn, id=column_id, teacher=request.user)
+    if request.method == 'POST':
+        column.delete()
+    return redirect('teacher_content')
+
+def column_detail(request, column_id):
+    column = get_object_or_404(TeacherColumn, id=column_id)
+    is_owner = request.user.is_authenticated and request.user.id == column.teacher_id
+    if not column.is_published and not is_owner:
+        raise Http404()
+    articles = column.articles.all()
+    if not is_owner:
+        articles = articles.filter(is_published=True)
+    has_access = column.has_access(request.user)
+    return render(request, 'main/column_detail.html', {
+        'column': column, 'articles': articles, 'is_owner': is_owner,
+        'has_access': has_access,
+    })
+
+@login_required
+def subscribe_column(request, column_id):
+    column = get_object_or_404(TeacherColumn, id=column_id, is_published=True)
+    if request.method != 'POST' or not column.is_paid or column.teacher_id == request.user.id:
+        return redirect('column_detail', column_id=column.id)
+
+    now = timezone.now()
+    sub = ColumnSubscription.objects.filter(
+        user=request.user, column=column, expires_at__gte=now
+    ).order_by('-expires_at').first()
+    base = sub.expires_at if sub else now
+    new_expiry = base + timezone.timedelta(days=30)
+    if sub:
+        sub.expires_at = new_expiry
+        sub.save(update_fields=['expires_at'])
+    else:
+        ColumnSubscription.objects.create(
+            user=request.user, column=column, expires_at=new_expiry
+        )
+
+    Notification.objects.create(
+        user=column.teacher,
+        title='專欄有新訂閱',
+        content=f'{request.user.profile.display_name} 訂閱了你的專欄「{column.title}」。'
+    )
+    return redirect('column_detail', column_id=column.id)
+
+@login_required
+def add_article(request):
+    profile, redirect_resp = _require_teacher(request)
+    if redirect_resp:
+        return redirect_resp
+    if request.method == 'POST':
+        form = ArticleForm(request.POST, request.FILES, teacher=request.user)
+        if form.is_valid():
+            article = form.save(commit=False)
+            article.teacher = request.user
+            article.save()
+            return redirect('teacher_content')
+    else:
+        form = ArticleForm(teacher=request.user)
+    return render(request, 'main/content_form.html', {
+        'form': form, 'content_kind': '文章', 'is_edit': False,
+    })
+
+@login_required
+def edit_article(request, article_id):
+    article = get_object_or_404(TeacherArticle, id=article_id, teacher=request.user)
+    if request.method == 'POST':
+        form = ArticleForm(request.POST, request.FILES, instance=article, teacher=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('teacher_content')
+    else:
+        form = ArticleForm(instance=article, teacher=request.user)
+    return render(request, 'main/content_form.html', {
+        'form': form, 'content_kind': '文章', 'is_edit': True,
+    })
+
+@login_required
+def delete_article(request, article_id):
+    article = get_object_or_404(TeacherArticle, id=article_id, teacher=request.user)
+    if request.method == 'POST':
+        article.delete()
+    return redirect('teacher_content')
+
+def article_detail(request, article_id):
+    article = get_object_or_404(
+        TeacherArticle.objects.select_related('teacher', 'teacher__profile', 'column'),
+        id=article_id,
+    )
+    is_owner = request.user.is_authenticated and request.user.id == article.teacher_id
+    if not article.is_published and not is_owner:
+        raise Http404()
+    locked = bool(article.column and article.column.is_paid and not article.column.has_access(request.user))
+    return render(request, 'main/article_detail.html', {
+        'article': article, 'is_owner': is_owner, 'locked': locked,
+    })
+
+@login_required
+def add_material(request):
+    profile, redirect_resp = _require_teacher(request)
+    if redirect_resp:
+        return redirect_resp
+    if request.method == 'POST':
+        form = MaterialForm(request.POST, request.FILES)
+        if form.is_valid():
+            material = form.save(commit=False)
+            material.teacher = request.user
+            material.save()
+            return redirect('teacher_content')
+    else:
+        form = MaterialForm()
+    return render(request, 'main/content_form.html', {
+        'form': form, 'content_kind': '教材', 'is_edit': False,
+    })
+
+@login_required
+def edit_material(request, material_id):
+    material = get_object_or_404(TeacherMaterial, id=material_id, teacher=request.user)
+    if request.method == 'POST':
+        form = MaterialForm(request.POST, request.FILES, instance=material)
+        if form.is_valid():
+            form.save()
+            return redirect('teacher_content')
+    else:
+        form = MaterialForm(instance=material)
+    return render(request, 'main/content_form.html', {
+        'form': form, 'content_kind': '教材', 'is_edit': True,
+    })
+
+@login_required
+def delete_material(request, material_id):
+    material = get_object_or_404(TeacherMaterial, id=material_id, teacher=request.user)
+    if request.method == 'POST':
+        material.delete()
+    return redirect('teacher_content')
+
+@login_required
+def ask_ai(request, course_id):
+    course = get_object_or_404(Course, id=course_id)
+
+    is_teacher = course.teacher_id == request.user.id
+    enrolled = Enrollment.objects.filter(course=course, student=request.user).exists()
+    if not (is_teacher or enrolled or request.user.is_superuser):
+        return JsonResponse({'ok': False, 'error': '購買本課程後即可使用 AI 助教。'}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': '方法不允許。'}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+        question = payload.get('question', '')
+        history = payload.get('history', [])
+    except (ValueError, AttributeError):
+        question = request.POST.get('question', '')
+        history = []
+
+    from . import ai_assistant
+
+    faq = ai_assistant.match_platform_faq(question)
+    if faq:
+        return JsonResponse({
+            'ok': True, 'answer': faq['answer'], 'faq': True, 'suggestions': [],
+        })
+
+    result = ai_assistant.answer_course_question(course, question, history=history)
+    return JsonResponse(result)
+
+@login_required
+def ask_platform_ai(request):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': '方法不允許。'}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+        question = payload.get('question', '')
+        history = payload.get('history', [])
+    except (ValueError, AttributeError):
+        question = request.POST.get('question', '')
+        history = []
+
+    from . import ai_assistant
+
+    faq = ai_assistant.match_platform_faq(question)
+    if faq:
+        return JsonResponse({
+            'ok': True, 'answer': faq['answer'], 'faq': True, 'suggestions': [],
+        })
+
+    result = ai_assistant.answer_platform_question(question, history=history)
+    return JsonResponse(result)
 
 def _file_iterator(path, start, length, chunk=8192):
     with open(path, 'rb') as f:
@@ -2679,18 +3020,11 @@ def _file_iterator(path, start, length, chunk=8192):
             remaining -= len(data)
             yield data
 
-
-def serve_media(request, path):
+def _range_file_response(request, full):
     import os
     import re
     import mimetypes
-    from django.conf import settings
-    from django.http import StreamingHttpResponse, Http404
-
-    media_root = str(settings.MEDIA_ROOT)
-    full = os.path.normpath(os.path.join(media_root, path))
-    if not full.startswith(media_root) or not os.path.isfile(full):
-        raise Http404('media not found')
+    from django.http import StreamingHttpResponse
 
     ctype = mimetypes.guess_type(full)[0] or 'application/octet-stream'
     size = os.path.getsize(full)
@@ -2717,3 +3051,308 @@ def serve_media(request, path):
 
     resp['Accept-Ranges'] = 'bytes'
     return resp
+
+@login_required
+def stream_lesson_video(request, lesson_id):
+    lesson = get_object_or_404(
+        CourseLesson.objects.select_related('chapter__course'), id=lesson_id
+    )
+    course = lesson.chapter.course
+
+    enrolled = Enrollment.objects.filter(student=request.user, course=course).exists()
+    is_teacher = course.teacher_id == request.user.id
+    if not (enrolled or is_teacher or lesson.is_free_preview):
+        raise Http404('沒有這個影片')
+
+    if not lesson.video_file:
+        raise Http404('這個單元沒有上傳影片')
+
+    try:
+        local_path = lesson.video_file.path
+    except (NotImplementedError, ValueError):
+        local_path = None
+    if local_path:
+        return _range_file_response(request, local_path)
+    return redirect(lesson.video_file.url)
+
+def serve_media(request, path):
+    import os
+    from django.conf import settings
+
+    media_root = os.path.normpath(str(settings.MEDIA_ROOT))
+    full = os.path.normpath(os.path.join(media_root, path))
+
+    try:
+        inside = os.path.commonpath([full, media_root]) == media_root
+    except ValueError:
+        inside = False
+    if not inside or not os.path.isfile(full):
+        raise Http404('media not found')
+
+    rel = os.path.relpath(full, media_root).replace('\\', '/')
+    if rel.startswith('course_videos/'):
+        raise Http404('media not found')
+
+    return _range_file_response(request, full)
+
+def _attach_reviews(courses):
+    courses = list(courses)
+    ids = [c.id for c in courses]
+    stats_map = {
+        row['course']: row
+        for row in Review.objects.filter(course_id__in=ids)
+        .values('course')
+        .annotate(avg=Avg('rating'), n=Count('id'))
+    }
+    for c in courses:
+        s = stats_map.get(c.id)
+        c.avg_rating = round(s['avg'], 1) if s and s['avg'] else None
+        c.review_count = s['n'] if s else 0
+    return courses
+
+def _group_cart_items_by_bundle(items):
+    bundle_groups = {}
+    loose_items = []
+    for item in items:
+        if item.bundle_id:
+            bundle_groups.setdefault(item.bundle_id, []).append(item)
+        else:
+            loose_items.append(item)
+
+    display_bundles = []
+    for group_items in bundle_groups.values():
+        bundle = group_items[0].bundle
+        bundle_course_ids = set(bundle.courses.values_list('id', flat=True))
+        group_course_ids = {gi.course_id for gi in group_items}
+        is_intact = bundle_course_ids == group_course_ids and bundle.is_active
+        display_bundles.append({
+            'bundle': bundle,
+            'items': group_items,
+            'is_intact': is_intact,
+            'individual_total': sum(gi.course.get_effective_price() for gi in group_items),
+        })
+
+    return display_bundles, loose_items
+
+def _is_teacher(profile):
+    return profile.role == 'teacher' or profile.is_teacher
+
+def _login_error_redirect(message):
+    return redirect(f"{reverse('login')}?{urlencode({'error': message})}")
+
+def _post_login_redirect(user):
+    if user.is_superuser:
+        return redirect('/admin/')
+    return redirect('home')
+
+@login_required
+def add_announcement(request, course_id):
+    course, redirect_resp = _require_course_teacher(request, course_id)
+    if redirect_resp:
+        return redirect_resp
+
+    if request.method == 'POST':
+        form = AnnouncementForm(request.POST)
+        if form.is_valid():
+            announcement = form.save(commit=False)
+            announcement.course = course
+            announcement.author = request.user
+            announcement.save()
+
+            from .models import Enrollment as _Enrollment, TeacherFollow as _Follow
+            from .notifications import notify_users
+            audience = set(
+                _Enrollment.objects.filter(course=course).values_list('student_id', flat=True)
+            ) | set(
+                _Follow.objects.filter(teacher=course.teacher).values_list('follower_id', flat=True)
+            )
+            notify_users(
+                audience,
+                f'課程新公告：{course.title}',
+                f'「{course.title}」發布了新公告：{announcement.title}'
+            )
+
+    return redirect('manage_content', course_id=course.id)
+
+@login_required
+def add_bundle_to_cart(request, bundle_id):
+    if request.method != 'POST':
+        return redirect('view_cart')
+
+    bundle = get_object_or_404(CourseBundle, id=bundle_id, is_active=True)
+    courses = list(bundle.courses.all())
+
+    already_owns = Enrollment.objects.filter(
+        student=request.user, course__in=courses
+    ).exists()
+    if already_owns:
+        return redirect('course_detail', course_id=courses[0].id if courses else 0)
+
+    cart, _ = Cart.objects.get_or_create(user=request.user)
+    for course in courses:
+        CartItem.objects.update_or_create(
+            cart=cart, course=course, defaults={'bundle': bundle}
+        )
+
+    return redirect('view_cart')
+
+@login_required
+def add_comment(request, course_id):
+    course = get_object_or_404(Course, id=course_id)
+
+    if request.method == 'POST':
+        form = CommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.user = request.user
+            comment.course = course
+            comment.save()
+
+    return redirect('course_detail', course_id=course.id)
+
+def course_catalog(request):
+    sort = request.GET.get('sort', 'newest')
+    q = request.GET.get('q', '').strip()
+    cat = request.GET.get('cat', '').strip()
+
+    qs = Course.objects.filter(is_published=True).select_related('teacher', 'teacher__profile', 'category')
+
+    if q:
+        qs = qs.filter(
+            Q(title__icontains=q)
+            | Q(description__icontains=q)
+            | Q(teacher__username__icontains=q)
+            | Q(teacher__first_name__icontains=q)
+            | Q(teacher__last_name__icontains=q)
+        )
+    if cat:
+        qs = qs.filter(category__name=cat)
+
+    qs = qs.annotate(
+        student_count=Count('enrollment', distinct=True),
+        avg_rating_val=Avg('review__rating'),
+    )
+
+    sort_map = {
+        'newest': '-created_at',
+        'popular': '-student_count',
+        'price_asc': 'price',
+        'price_desc': '-price',
+        'rating': '-avg_rating_val',
+    }
+    if sort not in sort_map:
+        sort = 'newest'
+    if sort == 'popular':
+        qs = qs.order_by('-student_count', '-created_at')
+    elif sort == 'rating':
+        qs = qs.order_by(F('avg_rating_val').desc(nulls_last=True), '-created_at')
+    else:
+        qs = qs.order_by(sort_map[sort])
+
+    paginator = Paginator(qs, 8)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    _attach_reviews(page_obj.object_list)
+
+    categories = CourseCategory.objects.order_by('name')
+
+    return render(request, 'main/course_catalog.html', {
+        'page_obj': page_obj,
+        'sort': sort,
+        'q': q,
+        'cat': cat,
+        'categories': categories,
+        'sort_options': [
+            ('newest', '最新'),
+            ('popular', '熱門'),
+            ('rating', '評分最高'),
+            ('price_asc', '價格低→高'),
+            ('price_desc', '價格高→低'),
+        ],
+    })
+
+@login_required
+def delete_announcement(request, announcement_id):
+    announcement = get_object_or_404(CourseAnnouncement, id=announcement_id)
+    course, redirect_resp = _require_course_teacher(request, announcement.course_id)
+    if redirect_resp:
+        return redirect_resp
+
+    if request.method == 'POST':
+        announcement.delete()
+
+    return redirect('manage_content', course_id=course.id)
+
+def google_login(request):
+    if not settings.GOOGLE_OAUTH_CLIENT_ID:
+        return _login_error_redirect('Google 登入尚未設定。')
+    state = oauth.new_state()
+    request.session['google_oauth_state'] = state
+    return redirect(oauth.build_google_auth_url(request, state))
+
+def google_oauth_callback(request):
+    error = request.GET.get('error')
+    if error:
+        return _login_error_redirect('Google 登入已取消。')
+
+    state = request.GET.get('state')
+    expected_state = request.session.pop('google_oauth_state', None)
+    if not state or not expected_state or state != expected_state:
+        return _login_error_redirect('登入驗證失敗，請再試一次。')
+
+    code = request.GET.get('code')
+    if not code:
+        return _login_error_redirect('Google 未提供授權碼。')
+
+    try:
+        provider_id, email, name = oauth.fetch_google_profile(request, code)
+        user = oauth.get_or_create_user('google', provider_id, email, name)
+    except oauth.OAuthError:
+        return _login_error_redirect('Google 登入失敗，請稍後再試。')
+
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    return _post_login_redirect(user)
+
+def line_login(request):
+    if not settings.LINE_LOGIN_CHANNEL_ID:
+        return _login_error_redirect('LINE 登入尚未設定。')
+    state = oauth.new_state()
+    request.session['line_oauth_state'] = state
+    return redirect(oauth.build_line_auth_url(request, state))
+
+def line_oauth_callback(request):
+    error = request.GET.get('error')
+    if error:
+        return _login_error_redirect('LINE 登入已取消。')
+
+    state = request.GET.get('state')
+    expected_state = request.session.pop('line_oauth_state', None)
+    if not state or not expected_state or state != expected_state:
+        return _login_error_redirect('登入驗證失敗，請再試一次。')
+
+    code = request.GET.get('code')
+    if not code:
+        return _login_error_redirect('LINE 未提供授權碼。')
+
+    try:
+        provider_id, email, name = oauth.fetch_line_profile(request, code)
+        user = oauth.get_or_create_user('line', provider_id, email, name)
+    except oauth.OAuthError:
+        return _login_error_redirect('LINE 登入失敗，請稍後再試。')
+
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    return _post_login_redirect(user)
+
+@require_teacher
+def teacher_qna(request):
+
+    questions = CourseQuestion.objects.filter(
+        course__teacher=request.user
+    ).select_related('user', 'course').prefetch_related('answers').annotate(
+        human_answer_count=Count('answers', filter=Q(answers__is_ai_generated=False)),
+        ai_answer_count=Count('answers', filter=Q(answers__is_ai_generated=True)),
+    ).order_by('human_answer_count', '-created_at')
+
+    return render(request, 'main/teacher_qna.html', {
+        'questions': questions,
+        'answer_form': AnswerForm(),
+    })

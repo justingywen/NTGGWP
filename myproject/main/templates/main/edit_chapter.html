@@ -3,14 +3,14 @@
 
 {% block content %}
 <main class="max-w-lg mx-auto px-4 py-12">
-  <div class="bg-satdark-surface rounded-2xl ring-1 ring-satdark-border shadow-sm p-8 ef-form">
-    <h1 class="text-2xl font-black text-satdark-text mb-4">編輯章節</h1>
+  <div class="bg-white rounded-2xl ring-1 ring-slate-100 shadow-sm p-8 ef-form">
+    <h1 class="text-2xl font-black text-slate-900 mb-4">編輯章節</h1>
     <form method="post">
       {% csrf_token %}
       {{ form.as_p }}
       <div class="flex gap-3 mt-4">
         <button type="submit" class="bg-jp-primary hover:bg-jp-primaryHover text-white font-bold px-5 py-2.5 rounded-lg transition">儲存</button>
-        <a href="{% url 'manage_content' course.id %}" class="bg-white/10 hover:bg-white/20 text-satdark-text font-bold px-5 py-2.5 rounded-lg transition">取消</a>
+        <a href="{% url 'manage_content' course.id %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition">取消</a>
       </div>
     </form>
   </div>
