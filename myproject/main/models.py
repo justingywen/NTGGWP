@@ -25,6 +25,9 @@ class Profile(models.Model):
     line_id = models.CharField(
         max_length=255, unique=True, blank=True, null=True, verbose_name="LINE 帳號 ID"
     )
+    microsoft_id = models.CharField(
+        max_length=255, unique=True, blank=True, null=True, verbose_name="Microsoft 帳號 ID"
+    )
 
     is_teacher = models.BooleanField(default=False, verbose_name="具備教師權限")
 

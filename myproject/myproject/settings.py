@@ -69,22 +69,24 @@ LOGIN_URL = 'login'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'mssql',
         'NAME': os.environ.get('DB_NAME', 'course_platform_db'),
-        'USER': os.environ.get('DB_USER', 'root'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', '0000'),
-        'HOST': os.environ.get('DB_HOST', '127.0.0.1'),
-        'PORT': os.environ.get('DB_PORT', '3306'),
+        'USER': os.environ.get('DB_USER', ''),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '1433'),
         'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
         'OPTIONS': {
-            'charset': 'utf8mb4',
+            'driver': os.environ.get('DB_ODBC_DRIVER', 'ODBC Driver 18 for SQL Server'),
+            # Azure SQL Database 要求連線加密；本機 SQL Server 若未裝憑證可將
+            # TrustServerCertificate 改 yes（僅限開發環境）。
+            'extra_params': os.environ.get(
+                'DB_EXTRA_PARAMS',
+                'Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;',
+            ),
         },
     }
 }
-
-_db_ssl_ca = os.environ.get('DB_SSL_CA')
-if _db_ssl_ca:
-    DATABASES['default']['OPTIONS']['ssl'] = {'ca': _db_ssl_ca}
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -124,19 +126,20 @@ STORAGES = {
     },
 }
 
-AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
-if AWS_STORAGE_BUCKET_NAME:
-    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', '')
-    _ak = os.environ.get('AWS_ACCESS_KEY_ID', '')
-    _sk = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
-    if _ak and _sk:
-        AWS_ACCESS_KEY_ID = _ak
-        AWS_SECRET_ACCESS_KEY = _sk
-    AWS_S3_SIGNATURE_VERSION = 's3v4'
-    if AWS_S3_REGION_NAME:
-        AWS_S3_ENDPOINT_URL = f'https://s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+AZURE_ACCOUNT_NAME = os.environ.get('AZURE_ACCOUNT_NAME', '')
+if AZURE_ACCOUNT_NAME:
+    AZURE_CONTAINER = os.environ.get('AZURE_CONTAINER', 'media')
+    _azure_key = os.environ.get('AZURE_ACCOUNT_KEY', '')
+    _azure_sas = os.environ.get('AZURE_SAS_TOKEN', '')
+    if _azure_key:
+        AZURE_ACCOUNT_KEY = _azure_key
+    elif _azure_sas:
+        AZURE_SAS_TOKEN = _azure_sas
+    _azure_custom_domain = os.environ.get('AZURE_CUSTOM_DOMAIN', '')
+    if _azure_custom_domain:
+        AZURE_CUSTOM_DOMAIN = _azure_custom_domain
     STORAGES['default'] = {
-        'BACKEND': 'storages.backends.s3.S3Storage',
+        'BACKEND': 'storages.backends.azure_storage.AzureStorage',
         'OPTIONS': {'location': 'media'},
     }
 
@@ -158,6 +161,13 @@ GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '')
 
 LINE_LOGIN_CHANNEL_ID = os.environ.get('LINE_LOGIN_CHANNEL_ID', '')
 LINE_LOGIN_CHANNEL_SECRET = os.environ.get('LINE_LOGIN_CHANNEL_SECRET', '')
+
+# Microsoft Entra ID（Azure AD）SSO，供學生用學校 / 個人 Microsoft 帳號登入。
+# TENANT 預設 'common'（個人 + 組織帳號皆可），限定學校租戶請填該校的 Tenant ID
+# 或 'organizations'（僅限組織帳號，排除個人 Microsoft 帳號）。
+MICROSOFT_OAUTH_CLIENT_ID = os.environ.get('MICROSOFT_OAUTH_CLIENT_ID', '')
+MICROSOFT_OAUTH_CLIENT_SECRET = os.environ.get('MICROSOFT_OAUTH_CLIENT_SECRET', '')
+MICROSOFT_OAUTH_TENANT_ID = os.environ.get('MICROSOFT_OAUTH_TENANT_ID', 'common')
 
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 AI_ASSISTANT_MODEL = os.environ.get('AI_ASSISTANT_MODEL', 'claude-opus-5')

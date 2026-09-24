@@ -57,6 +57,8 @@ urlpatterns = [
     path('oauth/google/callback/', views.google_oauth_callback, name='google_oauth_callback'),
     path('oauth/line/login/', views.line_login, name='line_login'),
     path('oauth/line/callback/', views.line_oauth_callback, name='line_oauth_callback'),
+    path('oauth/microsoft/login/', views.microsoft_login, name='microsoft_login'),
+    path('oauth/microsoft/callback/', views.microsoft_oauth_callback, name='microsoft_oauth_callback'),
 
     path('profile/', views.profile_view, name='profile'),
     path('profile/edit/', views.edit_profile, name='edit_profile'),

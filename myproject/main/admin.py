@@ -149,6 +149,8 @@ class ProfileAdmin(admin.ModelAdmin):
             return _badge('Google', '#1d4ed8', '#dbeafe')
         if obj.line_id:
             return _badge('LINE', '#166534', '#dcfce7')
+        if obj.microsoft_id:
+            return _badge('Microsoft', '#5b21b6', '#ede9fe')
         return '—'
 
     @admin.action(description='✅ 賦予教師權限')

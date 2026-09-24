@@ -3342,6 +3342,36 @@ def line_oauth_callback(request):
     login(request, user, backend='django.contrib.auth.backends.ModelBackend')
     return _post_login_redirect(user)
 
+def microsoft_login(request):
+    if not settings.MICROSOFT_OAUTH_CLIENT_ID:
+        return _login_error_redirect('Microsoft 登入尚未設定。')
+    state = oauth.new_state()
+    request.session['microsoft_oauth_state'] = state
+    return redirect(oauth.build_microsoft_auth_url(request, state))
+
+def microsoft_oauth_callback(request):
+    error = request.GET.get('error')
+    if error:
+        return _login_error_redirect('Microsoft 登入已取消。')
+
+    state = request.GET.get('state')
+    expected_state = request.session.pop('microsoft_oauth_state', None)
+    if not state or not expected_state or state != expected_state:
+        return _login_error_redirect('登入驗證失敗，請再試一次。')
+
+    code = request.GET.get('code')
+    if not code:
+        return _login_error_redirect('Microsoft 未提供授權碼。')
+
+    try:
+        provider_id, email, name = oauth.fetch_microsoft_profile(request, code)
+        user = oauth.get_or_create_user('microsoft', provider_id, email, name)
+    except oauth.OAuthError:
+        return _login_error_redirect('Microsoft 登入失敗，請稍後再試。')
+
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    return _post_login_redirect(user)
+
 @require_teacher
 def teacher_qna(request):
 
